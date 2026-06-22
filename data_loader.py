@@ -4,6 +4,16 @@ import pyreadstat
 import os
 
 # ==============================================================================
+# GLOBAL CONFIG
+# ==============================================================================
+ALL_ACTIVITIES = [
+    "Work", "Sell goods or provide services", "Housework", "Eating", "Sleeping",
+    "Personal care", "Shopping", "Caring", "Education", "Sport",
+    "TV/Online videos", "Passive leisure", "Active leisure",
+    "Outdoor activities", "Relaxing", "Travelling", "Others"
+]
+
+# ==============================================================================
 # DATA LOADING
 # ==============================================================================
 def load_and_transform_data():
@@ -14,7 +24,7 @@ def load_and_transform_data():
     # --------------------------------------------------------------------------
     # 1. LOAD VIETNAM DATA
     # --------------------------------------------------------------------------
-    vn_file = r'input\VN_time_use.csv'
+    vn_file = r'Data sources\VNM_2022_TUS_v01_M\Data\4_diary_main.csv'
     try:
         df_vn = pd.read_csv(vn_file, usecols=["ID", "age", "gender", "BEGIN", "Q401"], encoding='latin-1')
     except Exception as e:
@@ -62,7 +72,7 @@ def load_and_transform_data():
         else: return "Others"
 
     ca_to_vn = {
-        "Work": [501, 502, 503, 504, 505, 506, 507, 599],
+        "Work": [501, 502, 503, 504, 506, 507, 599],
         "Sell goods or provide services": [505],
         "Housework": list(range(201, 210)) + list(range(231, 242)),
         "Eating": [150, 151, 152, 153, 154, 404],
@@ -100,13 +110,16 @@ def load_and_transform_data():
     if not df_vn.empty:
         df_vn = df_vn.rename(columns={"ID": "person_id", "BEGIN": "minute_of_day", "Q401": "activity_group"})
         df_vn['minute_of_day'] = pd.to_numeric(df_vn['minute_of_day'], errors='coerce')
+        df_vn['survey_minute'] = (df_vn['minute_of_day'] - 240) % 1440
         df_vn['activity_group'] = df_vn['activity_group'].apply(get_vn_activity)
         df_vn['gender'] = df_vn['gender'].map({1: "Male", 2: "Female"})
         df_vn['age_group'] = pd.cut(df_vn['age'], bins=[14, 34, 54, 64, 150], labels=age_groups)
-        df_vn = df_vn.dropna(subset=['person_id', 'minute_of_day', 'activity_group'])
+        df_vn = df_vn.dropna(subset=['person_id', 'survey_minute', 'activity_group'])
     
     if not df_ca.empty:
         df_ca = df_ca.rename(columns={"PUMFID": "person_id", "STARTMIN": "minute_of_day", "TUI_01": "activity_group", "GENDER2": "gender", "AGEGR10": "age_group"})
+        df_ca['minute_of_day'] = pd.to_numeric(df_ca['minute_of_day'], errors='coerce')
+        df_ca['survey_minute'] = (df_ca['minute_of_day'] - 240) % 1440
         df_ca['activity_group'] = df_ca['activity_group'].apply(map_ca_activity)
         df_ca['gender'] = df_ca['gender'].map({1.0: "Male", 2.0: "Female"})
         ca_age_map = {1.0: "15 to 34 years", 2.0: "15 to 34 years", 
@@ -114,7 +127,7 @@ def load_and_transform_data():
                       5.0: "55 to 64 years", 
                       6.0: "65 years and over", 7.0: "65 years and over"}
         df_ca['age_group'] = df_ca['age_group'].map(ca_age_map)
-        df_ca = df_ca.dropna(subset=['person_id', 'minute_of_day', 'activity_group'])
+        df_ca = df_ca.dropna(subset=['person_id', 'survey_minute', 'activity_group'])
 
     return df_ca, df_vn
 
@@ -157,15 +170,15 @@ def aggregate_to_probabilities(df, group_by_cols=[]):
 
     # Real data processing
     # Sort by person and time
-    df = df.sort_values(group_by_cols + ['person_id', 'minute_of_day'])
+    df = df.sort_values(group_by_cols + ['person_id', 'survey_minute'])
     
     # We need to forward-fill activities for each person for every minute of the day.
     # To keep it fast, we will pivot to have persons as rows, minutes as columns
     
     def process_group(g_df):
         # Drop duplicates at same minute, keep last
-        g_df = g_df.drop_duplicates(subset=['person_id', 'minute_of_day'], keep='last')
-        pivot = g_df.pivot(index='person_id', columns='minute_of_day', values='activity_group')
+        g_df = g_df.drop_duplicates(subset=['person_id', 'survey_minute'], keep='last')
+        pivot = g_df.pivot(index='person_id', columns='survey_minute', values='activity_group')
         # Reindex to all 1440 minutes
         pivot = pivot.reindex(columns=range(1440))
         # Forward fill activities for each person
@@ -178,9 +191,18 @@ def aggregate_to_probabilities(df, group_by_cols=[]):
         counts = pivot.apply(lambda x: x.value_counts(normalize=True)) * 100
         counts = counts.fillna(0).T
         
-        # Create proper datetime index starting from 04:00 as requested or 00:00
-        time_index = pd.date_range("2022-01-01 00:00:00", periods=1440, freq="min")
+        # Ensure all defined activities are present in columns (pad with 0)
+        for act in ALL_ACTIVITIES:
+            if act not in counts.columns:
+                counts[act] = 0
+                
+        # Create proper datetime index starting from 04:00
+        time_index = pd.date_range("2022-01-01 04:00:00", periods=1440, freq="min")
         counts.index = time_index
+        
+        # Rearrange index so the chart physically starts at 00:00 and ends at 23:59 on a single day
+        counts.index = counts.index.map(lambda t: t if t.hour >= 4 else t - pd.Timedelta(days=1))
+        counts = counts.sort_index()
         return counts
 
     if not group_by_cols:

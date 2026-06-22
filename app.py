@@ -32,7 +32,7 @@ COLORS = {
     "TV/Online videos": "#ff7979", "Passive leisure": "#badc58", 
     "Active leisure": "#22a6b3", "Outdoor activities": "#f6e58d",
     "Sell goods or provide services": "#dff9fb", "Relaxing": "#c7ecee",
-    "Others": "#bdc3c7"
+    "Shopping": "#e84393", "Others": "#bdc3c7"
 }
 
 # ==============================================================================
@@ -72,27 +72,54 @@ def create_overview_chart(df):
     fig = go.Figure()
     plot_stacked_area(fig, df)
     fig.update_layout(**create_base_layout())
+    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+    fig.update_yaxes(range=[0, 100])
     return fig
 
 def create_gender_chart(df_dict):
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, subplot_titles=("Male", "Female"))
+    fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.05, subplot_titles=("Male", "Female"))
     plot_stacked_area(fig, df_dict[('Male',)], row=1, col=1)
-    plot_stacked_area(fig, df_dict[('Female',)], row=2, col=1)
+    plot_stacked_area(fig, df_dict[('Female',)], row=1, col=2)
     fig.update_layout(**create_base_layout())
-    # Enable rangeslider only on the bottom x-axis
-    fig.update_layout(xaxis_rangeslider_visible=False, xaxis2_rangeslider_visible=True, xaxis2_thickness=0.1)
+    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+    fig.update_yaxes(range=[0, 100])
+    # Enable rangeslider for both x-axes since they are side by side
+    fig.update_layout(xaxis_rangeslider=dict(visible=True, thickness=0.05), 
+                      xaxis2_rangeslider=dict(visible=True, thickness=0.05))
     return fig
 
 def create_age_chart(df_dict):
-    fig = make_subplots(rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.03, 
+    fig = make_subplots(rows=2, cols=2, shared_yaxes=True, shared_xaxes=True, 
+                        vertical_spacing=0.08, horizontal_spacing=0.05,
                         subplot_titles=("15-34", "35-54", "55-64", "65+"))
     plot_stacked_area(fig, df_dict[('15 to 34 years',)], row=1, col=1)
-    plot_stacked_area(fig, df_dict[('35 to 54 years',)], row=2, col=1)
-    plot_stacked_area(fig, df_dict[('55 to 64 years',)], row=3, col=1)
-    plot_stacked_area(fig, df_dict[('65 years and over',)], row=4, col=1)
+    plot_stacked_area(fig, df_dict[('35 to 54 years',)], row=1, col=2)
+    plot_stacked_area(fig, df_dict[('55 to 64 years',)], row=2, col=1)
+    
+    # Check if df is not empty AND actually contains non-zero data
+    has_65 = not df_dict[('65 years and over',)].empty and df_dict[('65 years and over',)].sum().sum() > 0
+    if has_65:
+        plot_stacked_area(fig, df_dict[('65 years and over',)], row=2, col=2)
+        
     fig.update_layout(**create_base_layout())
-    fig.update_layout(xaxis_rangeslider_visible=False, xaxis2_rangeslider_visible=False, 
-                      xaxis3_rangeslider_visible=False, xaxis4_rangeslider_visible=True, xaxis4_thickness=0.1)
+    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+    fig.update_yaxes(range=[0, 100])
+    
+    # Configure rangesliders
+    fig.update_layout(xaxis_rangeslider_visible=False, xaxis3_rangeslider=dict(visible=True, thickness=0.05))
+    
+    if has_65:
+        fig.update_layout(xaxis2_rangeslider_visible=False, xaxis4_rangeslider=dict(visible=True, thickness=0.05))
+    else:
+        # Hide the 65+ subplot axes completely
+        fig.update_layout(xaxis4_visible=False, yaxis4_visible=False)
+        # Enable rangeslider on xaxis2 (since xaxis4 is gone)
+        fig.update_layout(xaxis2_rangeslider=dict(visible=True, thickness=0.05))
+        # Remove '65+' title from annotations
+        for ann in fig.layout.annotations:
+            if ann.text == "65+":
+                ann.text = ""
+                
     return fig
 
 def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
@@ -156,6 +183,8 @@ def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
         ))
 
     fig.update_layout(**create_base_layout())
+    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+    fig.update_yaxes(range=[0, 100])
     return fig
 
 def create_ridgeline_plot(df):
@@ -277,6 +306,8 @@ app.index_string = '''
             @media (max-width: 767px) {
                 .main-row { flex-direction: column; }
                 .col-card { height: 50%; }
+                .legend-container { display: none !important; }
+                .hovertext text { font-size: 10px !important; }
             }
         </style>
     </head>
@@ -321,7 +352,7 @@ navbar = dbc.Navbar(
 
 # Render Custom Legend function
 def render_legend(country_id):
-    buttons = [html.Button("Show All", id={"type": "legend-btn", "act": "Show All", "country": country_id}, className="legend-btn", style={"backgroundColor": "#34495e"})]
+    buttons = []
     for act, color in COLORS.items():
         buttons.append(html.Button(act, id={"type": "legend-btn", "act": act, "country": country_id}, className="legend-btn", style={"backgroundColor": color}))
     return html.Div(buttons, className="legend-container")
@@ -329,17 +360,27 @@ def render_legend(country_id):
 app.layout = html.Div([
     dcc.Store(id='current-view', data='overview'),
     dcc.Store(id='selected-activity', data='Show All'),
+    dcc.Store(id='is-mobile', data=False),
+    dcc.Store(id='mobile-sub-view', data='Male'),
+    html.Div(id="dummy-resize-trigger", style={"display": "none"}),
     navbar,
     dbc.Row(className="main-row", children=[
         # CANADA CARD
         dbc.Col(className="col-card", xs=12, md=6, children=[
             dbc.Card([
                 dbc.CardHeader(className="d-flex justify-content-between align-items-center py-1", children=[
-                    html.H5("🇨🇦 Canada", className="m-0 fw-bold"),
-                    dbc.Button("View Data", id="btn-toggle-ca", size="sm", outline=True, color="secondary")
+                    html.Div(style={"width": "160px"}),
+                    html.H5("Daily Time Use in Canada", className="m-0 fw-bold text-center", style={"flex": "1"}),
+                    html.Div([
+                        dbc.Button("Show All", id="btn-show-all-ca", size="sm", color="dark", className="me-2"),
+                        dbc.Button("View Data", id="btn-toggle-ca", size="sm", outline=True, color="secondary")
+                    ], className="d-flex", style={"width": "160px", "justifyContent": "flex-end"})
                 ]),
                 dbc.CardBody([
-                    html.Div(id="chart-container-ca", className="graph-container", children=[dcc.Graph(id="chart-ca", style={"height": "100%", "width": "100%"})]),
+                    html.Div(id="chart-container-ca", className="graph-container", children=[
+                        html.Div(id="mobile-nav-ca", style={"display": "none"}),
+                        dcc.Graph(id="chart-ca", config={'displayModeBar': False}, style={"height": "100%", "width": "100%"})
+                    ]),
                     html.Div(id="table-container-ca", className="graph-container", style={"display": "none"}),
                     html.Div(id="legend-container-ca", children=[render_legend("ca")])
                 ])
@@ -349,11 +390,18 @@ app.layout = html.Div([
         dbc.Col(className="col-card", xs=12, md=6, children=[
             dbc.Card([
                 dbc.CardHeader(className="d-flex justify-content-between align-items-center py-1", children=[
-                    html.H5("🇻🇳 Vietnam", className="m-0 fw-bold"),
-                    dbc.Button("View Data", id="btn-toggle-vn", size="sm", outline=True, color="secondary")
+                    html.Div(style={"width": "160px"}),
+                    html.H5("Daily Time Use in Vietnam", className="m-0 fw-bold text-center", style={"flex": "1"}),
+                    html.Div([
+                        dbc.Button("Show All", id="btn-show-all-vn", size="sm", color="dark", className="me-2"),
+                        dbc.Button("View Data", id="btn-toggle-vn", size="sm", outline=True, color="secondary")
+                    ], className="d-flex", style={"width": "160px", "justifyContent": "flex-end"})
                 ]),
                 dbc.CardBody([
-                    html.Div(id="chart-container-vn", className="graph-container", children=[dcc.Graph(id="chart-vn", style={"height": "100%", "width": "100%"})]),
+                    html.Div(id="chart-container-vn", className="graph-container", children=[
+                        html.Div(id="mobile-nav-vn", style={"display": "none"}),
+                        dcc.Graph(id="chart-vn", config={'displayModeBar': False}, style={"height": "100%", "width": "100%"})
+                    ]),
                     html.Div(id="table-container-vn", className="graph-container", style={"display": "none"}),
                     html.Div(id="legend-container-vn", children=[render_legend("vn")])
                 ])
@@ -383,17 +431,84 @@ def toggle_modal(n, is_open):
     if n: return not is_open
     return is_open
 
+# Show All Visibility
+@app.callback(
+    [Output("btn-show-all-ca", "style"), Output("btn-show-all-vn", "style")],
+    Input("selected-activity", "data")
+)
+def toggle_show_all(selected_act):
+    style = {"display": "none"} if selected_act == "Show All" else {"display": "block"}
+    return style, style
+
+# Mobile Width Detection
+app.clientside_callback(
+    """
+    function(active_tab) {
+        return window.innerWidth <= 767;
+    }
+    """,
+    Output("is-mobile", "data"),
+    Input("view-tabs", "active_tab")
+)
+
+# Mobile Navigation Headers
+@app.callback(
+    [Output("mobile-nav-ca", "children"), Output("mobile-nav-vn", "children"),
+     Output("mobile-nav-ca", "style"), Output("mobile-nav-vn", "style"),
+     Output("mobile-sub-view", "data")],
+    [Input("current-view", "data"), Input("is-mobile", "data"),
+     Input({"type": "nav-link", "view": dash.ALL}, "n_clicks")],
+    [State("mobile-sub-view", "data")]
+)
+def update_mobile_nav(view_mode, is_mobile, n_clicks_list, current_sub):
+    if not is_mobile or view_mode not in ["gender", "age"]:
+        return None, None, {"display": "none"}, {"display": "none"}, current_sub
+        
+    if ctx.triggered_id and isinstance(ctx.triggered_id, dict):
+        new_view = ctx.triggered_id.get("view")
+        if new_view: current_sub = new_view
+        
+    if view_mode == "gender" and current_sub not in ["Male", "Female"]:
+        current_sub = "Male"
+    elif view_mode == "age" and current_sub not in ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]:
+        current_sub = "15 to 34 years"
+        
+    nav_style = {"display": "flex", "justifyContent": "space-between", "alignItems": "center", "fontWeight": "bold", "marginBottom": "5px", "padding": "0 10px"}
+    
+    def render_nav(sub):
+        if view_mode == "gender":
+            left = html.Span("< Male", id={"type": "nav-link", "view": "Male"}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "left"}) if sub == "Female" else html.Span("", style={"flex": "1"})
+            right = html.Span("Female >", id={"type": "nav-link", "view": "Female"}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "right"}) if sub == "Male" else html.Span("", style={"flex": "1"})
+            title = html.Span("Female" if sub == "Female" else "Male", style={"flex": "1", "textAlign": "center"})
+            return [left, title, right]
+            
+        elif view_mode == "age":
+            ages = ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
+            labels = ["15-34", "35-54", "55-64", "65+"]
+            idx = ages.index(sub)
+            
+            left = html.Span(f"< {labels[idx-1]}", id={"type": "nav-link", "view": ages[idx-1]}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "left"}) if idx > 0 else html.Span("", style={"flex": "1"})
+            right = html.Span(f"{labels[idx+1]} >", id={"type": "nav-link", "view": ages[idx+1]}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "right"}) if idx < 3 else html.Span("", style={"flex": "1"})
+            title = html.Span(labels[idx], style={"flex": "1", "textAlign": "center"})
+            return [left, title, right]
+            
+    content = render_nav(current_sub)
+    return content, content, nav_style, nav_style, current_sub
+
 # Legend Click Handler
 @app.callback(
     Output('selected-activity', 'data'),
-    Input({'type': 'legend-btn', 'act': dash.ALL, 'country': dash.ALL}, 'n_clicks'),
+    [Input({'type': 'legend-btn', 'act': dash.ALL, 'country': dash.ALL}, 'n_clicks'),
+     Input('btn-show-all-ca', 'n_clicks'), Input('btn-show-all-vn', 'n_clicks')],
     prevent_initial_call=True
 )
-def handle_legend_click(n_clicks_list):
+def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks):
     if not ctx.triggered:
         return dash.no_update
     btn_id = ctx.triggered_id
-    if btn_id and isinstance(btn_id, dict):
+    if btn_id in ["btn-show-all-ca", "btn-show-all-vn"]:
+        return "Show All"
+    if isinstance(btn_id, dict):
         return btn_id['act']
     return dash.no_update
 
@@ -415,9 +530,10 @@ def sync_view_state(active_tab, spec_click, surp_click):
 # Chart Updater
 @app.callback(
     [Output("chart-ca", "figure"), Output("chart-vn", "figure")],
-    [Input("current-view", "data"), Input("selected-activity", "data"), Input("compare-mode", "value")]
+    [Input("current-view", "data"), Input("selected-activity", "data"), Input("compare-mode", "value"),
+     Input("is-mobile", "data"), Input("mobile-sub-view", "data")]
 )
-def update_figures(view_mode, selected_act, compare_mode):
+def update_figures(view_mode, selected_act, compare_mode, is_mobile, sub_view):
     df_ca_ov, df_vn_ov = data_cache['overview']
     
     def get_fig(is_ca):
@@ -428,13 +544,33 @@ def update_figures(view_mode, selected_act, compare_mode):
             if view_mode == "overview":
                 return create_overview_chart(df_ov)
             elif view_mode == "gender":
-                return create_gender_chart(data_cache['gender'][0] if is_ca else data_cache['gender'][1])
+                df_dict = data_cache['gender'][0] if is_ca else data_cache['gender'][1]
+                if is_mobile:
+                    fig = go.Figure()
+                    plot_stacked_area(fig, df_dict[(sub_view, )])
+                    fig.update_layout(**create_base_layout())
+                    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+                    fig.update_yaxes(range=[0, 100])
+                    return fig
+                else:
+                    return create_gender_chart(df_dict)
             elif view_mode == "age":
-                return create_age_chart(data_cache['age'][0] if is_ca else data_cache['age'][1])
+                df_dict = data_cache['age'][0] if is_ca else data_cache['age'][1]
+                if is_mobile:
+                    fig = go.Figure()
+                    has_data = not df_dict[(sub_view, )].empty and df_dict[(sub_view, )].sum().sum() > 0
+                    if has_data:
+                        plot_stacked_area(fig, df_dict[(sub_view, )])
+                    fig.update_layout(**create_base_layout())
+                    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+                    fig.update_yaxes(range=[0, 100])
+                    return fig
+                else:
+                    return create_age_chart(df_dict)
             elif view_mode == "special":
                 return create_ridgeline_plot(df_ov)
             elif view_mode == "surprise":
-                return create_surprise_chart(df_ca_ov, df_vn_ov)
+                return create_surprise_chart(df_ca_ov, df_vn_ov) if is_ca else go.Figure()
         return go.Figure()
         
     return get_fig(True), get_fig(False)
