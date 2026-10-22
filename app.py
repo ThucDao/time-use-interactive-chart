@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, Input, Output, State, ctx, dash_table, clientside_callback
+from dash import dcc, html, Input, Output, State, ctx, dash_table
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -14,7 +14,7 @@ from data_loader import get_dashboard_data
 # DATA INITIALIZATION
 # ==============================================================================
 CACHE_FILE = "processed_data.pkl"
-if os.path.exists(CACHE_FILE):
+if os.path.exists(CACHE_FILE) and os.environ.get("REGENERATE_CACHE") != "1":
     print("Loading cached data...")
     with open(CACHE_FILE, "rb") as f:
         data_cache = pickle.load(f)
@@ -35,6 +35,27 @@ COLORS = {
     "Shopping": "#e84393", "Others": "#bdc3c7"
 }
 
+# Standardized activity definitions
+ACTIVITY_DEFINITIONS = {
+    "Sleeping": "Nighttime sleep, naps, essential rest, and resting during illness.",
+    "Work": "Main or secondary paid employment, farming, business operations, telework, overtime, and work-related duties.",
+    "Eating": "Consuming meals, snacks, and beverages at home, work, or dining establishments.",
+    "Housework": "Cooking, meal preparation, indoor/outdoor cleaning, laundry, ironing, home repairs, and household organization.",
+    "Travelling": "Commuting to/from work, school, shopping, socializing, appointments, or errands via transit, car, bicycle, or walking.",
+    "Personal care": "Bathing, grooming, dressing, personal hygiene, and private health/medical self-care.",
+    "Caring": "Caring for children (feeding, playing, homework assistance) and eldercare or assisting sick/disabled family members.",
+    "Education": "Attending school/university lectures, studying, completing homework, taking courses, and educational training.",
+    "Sport": "Physical exercise, workouts, gym, competitive sports, running, cycling, swimming, and fitness activities.",
+    "TV/Online videos": "Watching broadcast television, cable, streaming platforms (e.g., Netflix, YouTube), and movies.",
+    "Passive leisure": "Reading books, magazines, or news; listening to music or podcasts; and casual social media browsing.",
+    "Active leisure": "Video gaming, hobbies, artistic activities, crafts, playing musical instruments, and attending social events.",
+    "Outdoor activities": "Walking, hiking, gardening, spending time in nature, parks, and outdoor recreational spaces.",
+    "Sell goods or provide services": "Informal commerce, market sales, retail selling, street vending, and independent client services.",
+    "Relaxing": "Meditating, resting awake, quiet contemplation, daydreaming, and intentional unstructured downtime.",
+    "Shopping": "Purchasing groceries, food, clothing, household goods, personal items, and online shopping.",
+    "Others": "Unclassified, unspecified, or miscellaneous diary entries not fitting other standardized categories."
+}
+
 # ==============================================================================
 # CHART GENERATORS
 # ==============================================================================
@@ -42,15 +63,36 @@ COLORS = {
 def create_base_layout(title=""):
     return dict(
         margin=dict(l=40, r=20, t=30, b=0),
-        xaxis=dict(rangeslider=dict(visible=True, thickness=0.1), type="date", showgrid=False, tickformat="%H:%M"),
+        xaxis=dict(
+            rangeslider=dict(visible=True, thickness=0.1),
+            type="date",
+            showgrid=False,
+            tickformat="%H:%M",
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1.5,
+            spikedash="dot",
+            spikecolor="#e74c3c"
+        ),
         yaxis=dict(range=[0, 100], showgrid=True),
         hovermode="x unified",
-        showlegend=False, # We use custom dash legends
+        showlegend=False,
         plot_bgcolor="white",
         paper_bgcolor="white",
         autosize=True,
-        # Add an invisible shape for parallel hover sync
-        shapes=[dict(type="line", x0=0, x1=0, y0=0, y1=1, xref="paper", yref="paper", line=dict(color="rgba(0,0,0,0)"))]
+        shapes=[
+            dict(
+                type="line",
+                x0="2022-01-01 00:00:00",
+                x1="2022-01-01 00:00:00",
+                y0=0,
+                y1=1,
+                xref="x",
+                yref="paper",
+                line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")
+            )
+        ]
     )
 
 def plot_stacked_area(fig, df, row=None, col=None):
@@ -80,10 +122,14 @@ def create_gender_chart(df_dict):
     fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.05, subplot_titles=("Male", "Female"))
     plot_stacked_area(fig, df_dict[('Male',)], row=1, col=1)
     plot_stacked_area(fig, df_dict[('Female',)], row=1, col=2)
-    fig.update_layout(**create_base_layout())
+    layout = create_base_layout()
+    layout['shapes'] = [
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x2", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
+    ]
+    fig.update_layout(**layout)
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
     fig.update_yaxes(range=[0, 100])
-    # Enable rangeslider for both x-axes since they are side by side
     fig.update_layout(xaxis_rangeslider=dict(visible=True, thickness=0.05), 
                       xaxis2_rangeslider=dict(visible=True, thickness=0.05))
     return fig
@@ -96,26 +142,27 @@ def create_age_chart(df_dict):
     plot_stacked_area(fig, df_dict[('35 to 54 years',)], row=1, col=2)
     plot_stacked_area(fig, df_dict[('55 to 64 years',)], row=2, col=1)
     
-    # Check if df is not empty AND actually contains non-zero data
     has_65 = not df_dict[('65 years and over',)].empty and df_dict[('65 years and over',)].sum().sum() > 0
     if has_65:
         plot_stacked_area(fig, df_dict[('65 years and over',)], row=2, col=2)
         
-    fig.update_layout(**create_base_layout())
+    layout = create_base_layout()
+    layout['shapes'] = [
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x2", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x3", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x4", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
+    ]
+    fig.update_layout(**layout)
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
     fig.update_yaxes(range=[0, 100])
     
-    # Configure rangesliders
     fig.update_layout(xaxis_rangeslider_visible=False, xaxis3_rangeslider=dict(visible=True, thickness=0.05))
-    
     if has_65:
         fig.update_layout(xaxis2_rangeslider_visible=False, xaxis4_rangeslider=dict(visible=True, thickness=0.05))
     else:
-        # Hide the 65+ subplot axes completely
         fig.update_layout(xaxis4_visible=False, yaxis4_visible=False)
-        # Enable rangeslider on xaxis2 (since xaxis4 is gone)
         fig.update_layout(xaxis2_rangeslider=dict(visible=True, thickness=0.05))
-        # Remove '65+' title from annotations
         for ann in fig.layout.annotations:
             if ann.text == "65+":
                 ann.text = ""
@@ -134,7 +181,6 @@ def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
             opacity=0.6, hovertemplate='<b>%{fullData.name}</b>: %{y:.1f}%<extra></extra>'
         ))
     else:
-        # Overlay Comparison
         main_name = "Canada" if is_ca else "Vietnam"
         other_name = "Vietnam" if is_ca else "Canada"
         
@@ -142,40 +188,25 @@ def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
         y_other = df_other[activity].values
         x_vals = df_main.index
         
-        # Draw Other Line
         fig.add_trace(go.Scatter(
             x=x_vals, y=y_other, name=f"{other_name} ({activity})",
             mode='lines', line=dict(color='gray', width=2),
             hovertemplate='<b>%{fullData.name}</b>: %{y:.1f}%<extra></extra>'
         ))
         
-        # Draw Main Line, fill between lines. Higher = green, Lower = red
-        # Plotly fill='tonexty' colors the whole area between. To color differently, we need to split traces or use a simple line and just hope it looks good.
-        # A simple approximation for Dash: draw the main line with tonexty, and use a neutral color, or calculate positive/negative areas.
-        # Due to Plotly limitations with multi-color fills, we will draw the area where main > other in green, and main < other in red by creating separate traces.
-        
         pos_y = np.where(y_main >= y_other, y_main, y_other)
         neg_y = np.where(y_main < y_other, y_main, y_other)
 
-        # Base trace (other)
         fig.add_trace(go.Scatter(x=x_vals, y=y_other, mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'))
-        
-        # Positive fill (Green)
         fig.add_trace(go.Scatter(
             x=x_vals, y=pos_y, fill='tonexty', fillcolor='rgba(46, 204, 113, 0.4)', 
             mode='lines', line=dict(width=0), name="Higher", hoverinfo='skip'
         ))
-        
-        # Base trace (other)
         fig.add_trace(go.Scatter(x=x_vals, y=y_other, mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'))
-        
-        # Negative fill (Red)
         fig.add_trace(go.Scatter(
             x=x_vals, y=neg_y, fill='tonexty', fillcolor='rgba(231, 76, 60, 0.4)', 
             mode='lines', line=dict(width=0), name="Lower", hoverinfo='skip'
         ))
-        
-        # Finally, the main line
         fig.add_trace(go.Scatter(
             x=x_vals, y=y_main, name=f"{main_name} ({activity})",
             mode='lines', line=dict(color=COLORS.get(activity, '#000'), width=3),
@@ -187,95 +218,80 @@ def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
     fig.update_yaxes(range=[0, 100])
     return fig
 
-def create_ridgeline_plot(df):
-    fig = go.Figure()
-    spacing = 40
-    activities = [a for a in df.columns if a in COLORS]
+def create_surprise_chart(df, country_name):
+    """ Animated horizontal bar chart showing top 5 activities for country_name over the 24h timeline """
+    times = df.index[::15]
+    top_n = 5
     
-    for i, act in enumerate(activities[::-1]):
-        base_y = i * spacing
-        fig.add_trace(go.Scatter(
-            x=df.index, y=[base_y] * len(df),
-            mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'
-        ))
-        fig.add_trace(go.Scatter(
-            x=df.index, y=df[act] + base_y,
-            fill='tonexty', name=act, mode='lines',
-            line=dict(color='white', width=1),
-            fillcolor=COLORS[act], opacity=0.85
-        ))
-
-    fig.update_layout(
-        margin=dict(l=10, r=10, t=10, b=30),
-        xaxis=dict(showgrid=False, type="date", tickformat="%H:%M"),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        hovermode="x unified",
-        showlegend=False,
-        plot_bgcolor="white"
-    )
-    return fig
-
-def create_surprise_chart(df_ca, df_vn):
-    """ Animated horizontal bar race showing top activities """
-    # Since animation in Dash Plotly can be heavy over 1440 frames, we sample every 15 mins (96 frames)
-    times = df_ca.index[::15]
+    tops = [df.loc[t].sort_values(ascending=True).tail(top_n) for t in times]
     
-    # Precompute top activities for CA and VN
-    ca_tops = []
-    vn_tops = []
-    for t in times:
-        ca_sort = df_ca.loc[t].sort_values(ascending=False)
-        vn_sort = df_vn.loc[t].sort_values(ascending=False)
-        ca_tops.append(ca_sort)
-        vn_tops.append(vn_sort)
-        
     frames = []
     for i, t in enumerate(times):
-        ca_row = ca_tops[i]
-        vn_row = vn_tops[i]
+        row = tops[i]
+        acts = list(row.index)
+        vals = list(row.values)
+        colors = [COLORS.get(a, '#3498db') for a in acts]
+        texts = [f" {a} ({v:.1f}%)" for a, v in zip(acts, vals)]
         
-        # Subplot 1: Top 1, Subplot 2: Top 2, Subplot 3: Top 3
-        frame_data = []
-        for rank in range(3):
-            ca_act = ca_row.index[rank]
-            ca_val = ca_row.iloc[rank]
-            vn_act = vn_row.index[rank]
-            vn_val = vn_row.iloc[rank]
-            
-            frame_data.append(go.Bar(
-                x=[ca_val, vn_val],
-                y=['Canada', 'Vietnam'],
+        frames.append(go.Frame(
+            data=[go.Bar(
+                x=vals,
+                y=acts,
                 orientation='h',
-                marker_color=[COLORS.get(ca_act, 'gray'), COLORS.get(vn_act, 'gray')],
-                text=[f"{ca_act} ({ca_val:.1f}%)", f"{vn_act} ({vn_val:.1f}%)"],
-                textposition='inside',
-                xaxis=f'x{rank+1}', yaxis=f'y{rank+1}'
-            ))
-        frames.append(go.Frame(data=frame_data, name=str(t.strftime("%H:%M"))))
-
-    fig = make_subplots(rows=3, cols=1, shared_xaxes=False, subplot_titles=("Top 1 Activity", "Top 2 Activity", "Top 3 Activity"))
+                marker=dict(color=colors, line=dict(color='white', width=1)),
+                text=texts,
+                textposition='auto',
+                textfont=dict(size=11),
+                hovertemplate='<b>%{y}</b>: %{x:.1f}%<extra></extra>'
+            )],
+            name=t.strftime("%H:%M")
+        ))
+        
+    initial_row = tops[0]
+    initial_acts = list(initial_row.index)
+    initial_vals = list(initial_row.values)
+    initial_colors = [COLORS.get(a, '#3498db') for a in initial_acts]
+    initial_texts = [f" {a} ({v:.1f}%)" for a, v in zip(initial_acts, initial_vals)]
     
-    # Add initial traces
-    for rank in range(3):
-        fig.add_trace(go.Bar(
-            x=[ca_tops[0].iloc[rank], vn_tops[0].iloc[rank]],
-            y=['Canada', 'Vietnam'], orientation='h',
-            marker_color=[COLORS.get(ca_tops[0].index[rank], 'gray'), COLORS.get(vn_tops[0].index[rank], 'gray')],
-            text=[f"{ca_tops[0].index[rank]}", f"{vn_tops[0].index[rank]}"],
-            textposition='inside'
-        ), row=rank+1, col=1)
-
-    fig.update_layout(
-        updatemenus=[dict(type="buttons", buttons=[dict(label="Play", method="animate", args=[None, dict(frame=dict(duration=100, redraw=True), fromcurrent=True)])])],
-        sliders=[dict(steps=[dict(method='animate', args=[[f.name], dict(mode='immediate', frame=dict(duration=100, redraw=True))], label=f.name) for f in frames])],
-        margin=dict(l=10, r=10, t=30, b=10),
-        showlegend=False,
-        plot_bgcolor="white"
+    fig = go.Figure(
+        data=[go.Bar(
+            x=initial_vals,
+            y=initial_acts,
+            orientation='h',
+            marker=dict(color=initial_colors, line=dict(color='white', width=1)),
+            text=initial_texts,
+            textposition='auto',
+            textfont=dict(size=11),
+            hovertemplate='<b>%{y}</b>: %{x:.1f}%<extra></extra>'
+        )],
+        layout=go.Layout(
+            title=dict(text=f"Top 5 Activities in {country_name}", font=dict(size=14, color="#2c3e50")),
+            xaxis=dict(range=[0, 100], title="Share of Population (%)", showgrid=True),
+            yaxis=dict(showgrid=False),
+            margin=dict(l=110, r=20, t=40, b=60),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            updatemenus=[dict(
+                type="buttons",
+                showactive=False,
+                x=0.0, y=-0.22,
+                xanchor="left", yanchor="top",
+                buttons=[
+                    dict(label="▶ Play", method="animate", args=[None, dict(frame=dict(duration=150, redraw=True), fromcurrent=True, transition=dict(duration=50))]),
+                    dict(label="⏸ Pause", method="animate", args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")])
+                ]
+            )],
+            sliders=[dict(
+                active=0,
+                x=0.22, y=-0.22,
+                len=0.76,
+                xanchor="left", yanchor="top",
+                currentvalue=dict(prefix="Time: ", font=dict(size=12, color="#2c3e50"), visible=True),
+                steps=[dict(method='animate', args=[[f.name], dict(mode='immediate', frame=dict(duration=100, redraw=True))], label=f.name) for f in frames]
+            )]
+        ),
+        frames=frames
     )
-    for i in range(1, 4):
-        fig['layout'][f'xaxis{i}'].update(range=[0, 100])
-    
-    fig.frames = frames
     return fig
 
 # ==============================================================================
@@ -284,7 +300,7 @@ def create_surprise_chart(df_ca, df_vn):
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_callback_exceptions=True)
 app.title = "Time Use Dashboard"
 
-# Ensure precise fit to screen
+# Ensure precise fit to screen & responsive layout
 app.index_string = '''
 <!DOCTYPE html>
 <html>
@@ -303,11 +319,14 @@ app.index_string = '''
             .legend-btn { font-size: 0.75rem; padding: 2px 6px; border: none; border-radius: 12px; cursor: pointer; color: white;}
             .main-row { height: calc(100vh - 60px); margin: 0; padding: 10px; }
             .col-card { height: 100%; padding: 5px; }
+            .card-header-title { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
+            .btn-compact { white-space: nowrap !important; }
             @media (max-width: 767px) {
-                .main-row { flex-direction: column; }
-                .col-card { height: 50%; }
+                .main-row { flex-direction: column; height: auto !important; overflow-y: auto; }
+                .col-card { height: 500px !important; margin-bottom: 15px; }
                 .legend-container { display: none !important; }
                 .hovertext text { font-size: 10px !important; }
+                html, body { overflow: auto !important; height: auto !important; }
             }
         </style>
     </head>
@@ -332,7 +351,6 @@ navbar = dbc.Navbar(
                 ],
                 className="me-2"
             ),
-            dbc.Button("Special Chart", id="btn-special", outline=True, color="light", size="sm", className="me-2 rounded-pill"),
             dbc.Button("Surprise Chart", id="btn-surprise", outline=True, color="light", size="sm", className="me-3 rounded-pill"),
             dbc.Select(
                 id="hover-mode",
@@ -368,13 +386,15 @@ app.layout = html.Div([
         # CANADA CARD
         dbc.Col(className="col-card", xs=12, md=6, children=[
             dbc.Card([
-                dbc.CardHeader(className="d-flex justify-content-between align-items-center py-1", children=[
-                    html.Div(style={"width": "160px"}),
-                    html.H5("Daily Time Use in Canada", className="m-0 fw-bold text-center", style={"flex": "1"}),
+                dbc.CardHeader(className="d-flex justify-content-between align-items-center py-2 px-3 flex-nowrap", children=[
+                    html.H5("Daily Time Use in Canada", className="m-0 fw-bold card-header-title", style={
+                        "whiteSpace": "nowrap", "overflow": "hidden", "textOverflow": "ellipsis",
+                        "fontSize": "clamp(0.85rem, 1.25vw, 1.15rem)", "flex": "1"
+                    }),
                     html.Div([
-                        dbc.Button("Show All", id="btn-show-all-ca", size="sm", color="dark", className="me-2"),
-                        dbc.Button("View Data", id="btn-toggle-ca", size="sm", outline=True, color="secondary")
-                    ], className="d-flex", style={"width": "160px", "justifyContent": "flex-end"})
+                        dbc.Button("Show All", id="btn-show-all-ca", size="sm", color="dark", className="me-1 btn-compact", style={"display": "none", "whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"}),
+                        dbc.Button("View Data", id="btn-toggle-ca", size="sm", outline=True, color="secondary", className="btn-compact", style={"whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"})
+                    ], className="d-flex align-items-center flex-shrink-0 ms-2")
                 ]),
                 dbc.CardBody([
                     html.Div(id="chart-container-ca", className="graph-container", children=[
@@ -389,13 +409,15 @@ app.layout = html.Div([
         # VIETNAM CARD
         dbc.Col(className="col-card", xs=12, md=6, children=[
             dbc.Card([
-                dbc.CardHeader(className="d-flex justify-content-between align-items-center py-1", children=[
-                    html.Div(style={"width": "160px"}),
-                    html.H5("Daily Time Use in Vietnam", className="m-0 fw-bold text-center", style={"flex": "1"}),
+                dbc.CardHeader(className="d-flex justify-content-between align-items-center py-2 px-3 flex-nowrap", children=[
+                    html.H5("Daily Time Use in Vietnam", className="m-0 fw-bold card-header-title", style={
+                        "whiteSpace": "nowrap", "overflow": "hidden", "textOverflow": "ellipsis",
+                        "fontSize": "clamp(0.85rem, 1.25vw, 1.15rem)", "flex": "1"
+                    }),
                     html.Div([
-                        dbc.Button("Show All", id="btn-show-all-vn", size="sm", color="dark", className="me-2"),
-                        dbc.Button("View Data", id="btn-toggle-vn", size="sm", outline=True, color="secondary")
-                    ], className="d-flex", style={"width": "160px", "justifyContent": "flex-end"})
+                        dbc.Button("Show All", id="btn-show-all-vn", size="sm", color="dark", className="me-1 btn-compact", style={"display": "none", "whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"}),
+                        dbc.Button("View Data", id="btn-toggle-vn", size="sm", outline=True, color="secondary", className="btn-compact", style={"whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"})
+                    ], className="d-flex align-items-center flex-shrink-0 ms-2")
                 ]),
                 dbc.CardBody([
                     html.Div(id="chart-container-vn", className="graph-container", children=[
@@ -411,10 +433,25 @@ app.layout = html.Div([
     
     # Definitions Modal
     dbc.Modal([
-        dbc.ModalHeader(dbc.ModalTitle("Activity Definitions")),
+        dbc.ModalHeader(dbc.ModalTitle("Activity Definitions (Standardized 2022 Surveys)"), close_button=True),
         dbc.ModalBody([
-            html.Ul([html.Li(f"{k}: Description for {k}") for k in COLORS.keys()])
+            html.P("Activities from Statistics Canada and World Bank Vietnam Time Use Surveys have been harmonized into 17 standardized categories:", className="text-muted mb-3"),
+            html.Div([
+                html.Div([
+                    html.Span(style={
+                        "display": "inline-block", "width": "14px", "height": "14px", "borderRadius": "50%",
+                        "backgroundColor": COLORS.get(act, "#999"), "border": "1px solid #bdc3c7",
+                        "marginRight": "10px", "flexShrink": "0"
+                    }),
+                    html.Strong(act, style={"minWidth": "170px", "marginRight": "10px", "color": "#2c3e50"}),
+                    html.Span(desc, className="text-secondary")
+                ], className="d-flex align-items-center py-2 border-bottom", style={"fontSize": "0.88rem"})
+                for act, desc in ACTIVITY_DEFINITIONS.items()
+            ], style={"maxHeight": "60vh", "overflowY": "auto"})
         ]),
+        dbc.ModalFooter(
+            dbc.Button("Close", id="btn-close-definitions", className="ms-auto", color="secondary", size="sm")
+        )
     ], id="modal-definitions", size="lg", is_open=False, centered=True)
 ])
 
@@ -424,12 +461,12 @@ app.layout = html.Div([
 
 @app.callback(
     Output("modal-definitions", "is_open"),
-    Input("btn-definitions", "n_clicks"),
+    [Input("btn-definitions", "n_clicks"), Input("btn-close-definitions", "n_clicks")],
     State("modal-definitions", "is_open"),
+    prevent_initial_call=True
 )
-def toggle_modal(n, is_open):
-    if n: return not is_open
-    return is_open
+def toggle_modal(n_open, n_close, is_open):
+    return not is_open
 
 # Show All Visibility
 @app.callback(
@@ -437,7 +474,10 @@ def toggle_modal(n, is_open):
     Input("selected-activity", "data")
 )
 def toggle_show_all(selected_act):
-    style = {"display": "none"} if selected_act == "Show All" else {"display": "block"}
+    if selected_act == "Show All":
+        style = {"display": "none"}
+    else:
+        style = {"display": "inline-block", "whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"}
     return style, style
 
 # Mobile Width Detection
@@ -514,18 +554,16 @@ def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks):
 
 # Tab and Button State Sync
 @app.callback(
-    [Output("current-view", "data"), Output("btn-special", "color"), Output("btn-surprise", "color")],
-    [Input("view-tabs", "active_tab"), Input("btn-special", "n_clicks"), Input("btn-surprise", "n_clicks")]
+    [Output("current-view", "data"), Output("btn-surprise", "color")],
+    [Input("view-tabs", "active_tab"), Input("btn-surprise", "n_clicks")]
 )
-def sync_view_state(active_tab, spec_click, surp_click):
+def sync_view_state(active_tab, surp_click):
     trig = ctx.triggered_id
-    if trig == "btn-special":
-        return "special", "warning", "light"
-    elif trig == "btn-surprise":
-        return "surprise", "light", "warning"
+    if trig == "btn-surprise":
+        return "surprise", "warning"
     else:
         # Default back to standard tabs
-        return active_tab or "overview", "light", "light"
+        return active_tab or "overview", "light"
 
 # Chart Updater
 @app.callback(
@@ -537,7 +575,9 @@ def update_figures(view_mode, selected_act, compare_mode, is_mobile, sub_view):
     df_ca_ov, df_vn_ov = data_cache['overview']
     
     def get_fig(is_ca):
+        country_name = "Canada" if is_ca else "Vietnam"
         df_ov = df_ca_ov if is_ca else df_vn_ov
+        
         if selected_act != "Show All":
             return create_isolated_chart(df_ov, df_vn_ov if is_ca else df_ca_ov, selected_act, compare_mode, is_ca)
         else:
@@ -567,10 +607,8 @@ def update_figures(view_mode, selected_act, compare_mode, is_mobile, sub_view):
                     return fig
                 else:
                     return create_age_chart(df_dict)
-            elif view_mode == "special":
-                return create_ridgeline_plot(df_ov)
             elif view_mode == "surprise":
-                return create_surprise_chart(df_ca_ov, df_vn_ov) if is_ca else go.Figure()
+                return create_surprise_chart(df_ov, country_name)
         return go.Figure()
         
     return get_fig(True), get_fig(False)
@@ -602,36 +640,47 @@ def toggle_data_view(btn_ca, btn_vn):
 
 
 # Sync Hover via Clientside Callback (Parallel Interaction)
-# Draws a vertical line on the other chart
 app.clientside_callback(
     """
     function(hoverCa, hoverVn, parallelMode) {
         if (parallelMode !== 'parallel') return window.dash_clientside.no_update;
         
         const tr = window.dash_clientside.callback_context.triggered;
-        if(!tr || !tr.length) return window.dash_clientside.no_update;
+        if (!tr || !tr.length) return window.dash_clientside.no_update;
         const prop_id = tr[0].prop_id;
         
-        let targetId = prop_id === 'chart-ca.hoverData' ? 'chart-vn' : 'chart-ca';
-        let hoverData = prop_id === 'chart-ca.hoverData' ? hoverCa : hoverVn;
+        const isCa = prop_id === 'chart-ca.hoverData';
+        const targetId = isCa ? 'chart-vn' : 'chart-ca';
+        const hoverData = isCa ? hoverCa : hoverVn;
         
-        if(!hoverData || !hoverData.points || !hoverData.points[0]) return window.dash_clientside.no_update;
+        if (!hoverData || !hoverData.points || !hoverData.points.length) return window.dash_clientside.no_update;
         
-        const x = hoverData.points[0].x;
-        const targetGraph = document.getElementById(targetId);
+        const xVal = hoverData.points[0].x;
+        const targetContainer = document.getElementById(targetId);
+        if (!targetContainer) return window.dash_clientside.no_update;
         
-        if(targetGraph) {
-            Plotly.relayout(targetGraph, {
-                'shapes[0]': {
-                    type: 'line', x0: x, x1: x, y0: 0, y1: 1, yref: 'paper',
-                    line: {color: 'black', width: 2, dash: 'dot'}
-                }
-            });
+        // Find actual Plotly graph DOM element
+        const gd = targetContainer.querySelector('.js-plotly-plot') || targetContainer;
+        if (!gd || !gd._fullLayout || typeof window.Plotly === 'undefined') return window.dash_clientside.no_update;
+        
+        const shapes = (gd.layout && gd.layout.shapes) ? gd.layout.shapes : [];
+        if (shapes.length > 0) {
+            const updates = {};
+            for (let i = 0; i < shapes.length; i++) {
+                updates['shapes[' + i + '].x0'] = xVal;
+                updates['shapes[' + i + '].x1'] = xVal;
+                updates['shapes[' + i + '].line.color'] = 'rgba(231, 76, 60, 0.9)';
+            }
+            try {
+                window.Plotly.relayout(gd, updates);
+            } catch (err) {
+                console.warn('Sync hover relayout error:', err);
+            }
         }
         return window.dash_clientside.no_update;
     }
     """,
-    Output("hover-mode", "id"), # Dummy output
+    Output("dummy-resize-trigger", "children"),
     Input("chart-ca", "hoverData"),
     Input("chart-vn", "hoverData"),
     State("hover-mode", "value"),

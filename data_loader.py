@@ -241,6 +241,10 @@ def get_dashboard_data():
     }
 
 if __name__ == "__main__":
-    # Test execution
+    import pickle
+    cache_path = "processed_data.pkl"
+    print("Regenerating processed_data.pkl from raw survey files...")
     data = get_dashboard_data()
-    print("Data processing complete.")
+    with open(cache_path, "wb") as f:
+        pickle.dump(data, f)
+    print(f"Data successfully processed and cached to {cache_path}.")
