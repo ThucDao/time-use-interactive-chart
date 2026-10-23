@@ -7,10 +7,12 @@ import os
 # GLOBAL CONFIG
 # ==============================================================================
 ALL_ACTIVITIES = [
-    "Work", "Sell goods or provide services", "Housework", "Eating", "Sleeping",
-    "Personal care", "Shopping", "Caring", "Education", "Sport",
-    "TV/Online videos", "Passive leisure", "Active leisure",
-    "Outdoor activities", "Relaxing", "Travelling", "Others"
+    "Sleeping", "Personal care", "Eating", "Travelling",
+    "Work", "Sell goods or provide services", "Education",
+    "Caring", "Housework", "Shopping",
+    "Sport", "Outdoor activities", "Active leisure",
+    "Relaxing", "TV/Online videos", "Passive leisure",
+    "Others"
 ]
 
 # ==============================================================================

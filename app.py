@@ -24,35 +24,85 @@ else:
     with open(CACHE_FILE, "wb") as f:
         pickle.dump(data_cache, f)
 
-# Colors for activities
+# Canonical category stacking order matching Statistics Canada Tempogram (bottom y=0 to top y=100)
+CATEGORY_ORDER = [
+    "Sleeping",
+    "Personal care",
+    "Eating",
+    "Travelling",
+    "Work",
+    "Sell goods or provide services",
+    "Education",
+    "Caring",
+    "Housework",
+    "Shopping",
+    "Sport",
+    "Outdoor activities",
+    "Active leisure",
+    "Relaxing",
+    "TV/Online videos",
+    "Passive leisure",
+    "Others"
+]
+
+def reorder_data_columns(data):
+    def reorder_df(df):
+        cols = [c for c in CATEGORY_ORDER if c in df.columns] + [c for c in df.columns if c not in CATEGORY_ORDER]
+        return df[cols]
+    
+    reordered = {}
+    for key, val in data.items():
+        if isinstance(val, tuple):
+            reordered[key] = tuple(reorder_df(x) if isinstance(x, pd.DataFrame) else {k: reorder_df(v) for k, v in x.items()} for x in val)
+        elif isinstance(val, pd.DataFrame):
+            reordered[key] = reorder_df(val)
+        elif isinstance(val, dict):
+            reordered[key] = {k: reorder_df(v) for k, v in val.items()}
+        else:
+            reordered[key] = val
+    return reordered
+
+data_cache = reorder_data_columns(data_cache)
+
+# Statistics Canada-aligned color palette for all 17 categories
 COLORS = {
-    "Sleeping": "#2c3e50", "Work": "#e74c3c", "Eating": "#f1c40f", 
-    "Housework": "#34495e", "Travelling": "#9b59b6", "Personal care": "#e67e22",
-    "Caring": "#1abc9c", "Education": "#3498db", "Sport": "#2ecc71",
-    "TV/Online videos": "#ff7979", "Passive leisure": "#badc58", 
-    "Active leisure": "#22a6b3", "Outdoor activities": "#f6e58d",
-    "Sell goods or provide services": "#dff9fb", "Relaxing": "#c7ecee",
-    "Shopping": "#e84393", "Others": "#bdc3c7"
+    "Sleeping": "#212842",
+    "Personal care": "#44636d",
+    "Eating": "#82cdc6",
+    "Travelling": "#5c242c",
+    "Work": "#c45427",
+    "Sell goods or provide services": "#db7342",
+    "Education": "#e89566",
+    "Caring": "#e5a83b",
+    "Housework": "#266344",
+    "Shopping": "#43875d",
+    "Sport": "#6aa67e",
+    "Outdoor activities": "#8ec2a0",
+    "Active leisure": "#3c1737",
+    "Relaxing": "#642857",
+    "TV/Online videos": "#883770",
+    "Passive leisure": "#a1477d",
+    "Others": "#d6a8ce"
 }
 
 # Standardized activity definitions
 ACTIVITY_DEFINITIONS = {
     "Sleeping": "Nighttime sleep, naps, essential rest, and resting during illness.",
-    "Work": "Main or secondary paid employment, farming, business operations, telework, overtime, and work-related duties.",
-    "Eating": "Consuming meals, snacks, and beverages at home, work, or dining establishments.",
-    "Housework": "Cooking, meal preparation, indoor/outdoor cleaning, laundry, ironing, home repairs, and household organization.",
-    "Travelling": "Commuting to/from work, school, shopping, socializing, appointments, or errands via transit, car, bicycle, or walking.",
     "Personal care": "Bathing, grooming, dressing, personal hygiene, and private health/medical self-care.",
-    "Caring": "Caring for children (feeding, playing, homework assistance) and eldercare or assisting sick/disabled family members.",
+    "Eating": "Consuming meals, snacks, and beverages at home, work, or dining establishments.",
+    "Travelling": "Commuting to/from work, school, shopping, socializing, appointments, or errands via transit, car, bicycle, or walking.",
+    "Work": "Main or secondary paid employment, farming, business operations, telework, overtime, and work-related duties.",
+    "Sell goods or provide services": "Informal commerce, market sales, retail selling, street vending, and independent client services.",
     "Education": "Attending school/university lectures, studying, completing homework, taking courses, and educational training.",
+    "Caring": "Caring for children (feeding, playing, homework assistance) and eldercare or assisting sick/disabled family members.",
+    "Housework": "Cooking, meal preparation, indoor/outdoor cleaning, laundry, ironing, home repairs, and household organization.",
+    "Shopping": "Purchasing groceries, food, clothing, household goods, personal items, and online shopping.",
     "Sport": "Physical exercise, workouts, gym, competitive sports, running, cycling, swimming, and fitness activities.",
+    "Outdoor activities": "Walking, hiking, gardening, spending time in nature, parks, and outdoor recreational spaces.",
+    "Active leisure": "Video gaming, hobbies, artistic activities, crafts, playing musical instruments, and attending social events.",
+    "Relaxing": "Meditating, resting awake, quiet contemplation, daydreaming, and intentional unstructured downtime.",
     "TV/Online videos": "Watching broadcast television, cable, streaming platforms (e.g., Netflix, YouTube), and movies.",
     "Passive leisure": "Reading books, magazines, or news; listening to music or podcasts; and casual social media browsing.",
-    "Active leisure": "Video gaming, hobbies, artistic activities, crafts, playing musical instruments, and attending social events.",
-    "Outdoor activities": "Walking, hiking, gardening, spending time in nature, parks, and outdoor recreational spaces.",
-    "Sell goods or provide services": "Informal commerce, market sales, retail selling, street vending, and independent client services.",
-    "Relaxing": "Meditating, resting awake, quiet contemplation, daydreaming, and intentional unstructured downtime.",
-    "Shopping": "Purchasing groceries, food, clothing, household goods, personal items, and online shopping.",
     "Others": "Unclassified, unspecified, or miscellaneous diary entries not fitting other standardized categories."
 }
 
@@ -103,7 +153,8 @@ def create_base_layout(title=""):
     )
 
 def plot_stacked_area(fig, df, row=None, col=None):
-    for act in df.columns:
+    ordered_acts = [act for act in CATEGORY_ORDER if act in df.columns] + [act for act in df.columns if act not in CATEGORY_ORDER]
+    for act in ordered_acts:
         if act in COLORS:
             trace = go.Scatter(
                 x=df.index, y=df[act],
@@ -431,11 +482,22 @@ navbar = dbc.Navbar(
     style={"height": "60px"}
 )
 
+def get_text_color(hex_color):
+    hex_color = hex_color.lstrip('#')
+    r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return "#2c3e50" if luminance > 0.6 else "#ffffff"
+
 # Render Custom Legend function
 def render_legend(country_id):
     buttons = []
     for act, color in COLORS.items():
-        buttons.append(html.Button(act, id={"type": "legend-btn", "act": act, "country": country_id}, className="legend-btn", style={"backgroundColor": color}))
+        buttons.append(html.Button(
+            act, 
+            id={"type": "legend-btn", "act": act, "country": country_id}, 
+            className="legend-btn", 
+            style={"backgroundColor": color, "color": get_text_color(color)}
+        ))
     return html.Div(buttons, className="legend-container")
 
 app.layout = html.Div([
