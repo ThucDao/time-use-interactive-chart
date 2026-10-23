@@ -236,7 +236,7 @@ def create_surprise_chart(df, country_name):
         acts = list(sorted_row.index)
         vals = list(sorted_row.values)
         colors = [COLORS.get(a, '#3498db') for a in acts]
-        texts = [f" {a} ({v:.1f}%)" if v >= 1.5 else (f" {v:.1f}%" if v > 0.4 else "") for a, v in zip(acts, vals)]
+        texts = [f" {v:.1f}%" for v in vals]
         
         frames.append(go.Frame(
             data=[go.Bar(
@@ -245,7 +245,8 @@ def create_surprise_chart(df, country_name):
                 orientation='h',
                 marker=dict(color=colors, line=dict(color='white', width=0.5)),
                 text=texts,
-                textposition='auto',
+                textposition='outside',
+                cliponaxis=False,
                 textfont=dict(size=9.5, color='#2c3e50'),
                 hovertemplate='<b>%{y}</b>: %{x:.1f}%<extra></extra>'
             )],
@@ -256,7 +257,7 @@ def create_surprise_chart(df, country_name):
     initial_acts = list(initial_row.index)
     initial_vals = list(initial_row.values)
     initial_colors = [COLORS.get(a, '#3498db') for a in initial_acts]
-    initial_texts = [f" {a} ({v:.1f}%)" if v >= 1.5 else (f" {v:.1f}%" if v > 0.4 else "") for a, v in zip(initial_acts, initial_vals)]
+    initial_texts = [f" {v:.1f}%" for v in initial_vals]
     
     fig = go.Figure(
         data=[go.Bar(
@@ -265,7 +266,8 @@ def create_surprise_chart(df, country_name):
             orientation='h',
             marker=dict(color=initial_colors, line=dict(color='white', width=0.5)),
             text=initial_texts,
-            textposition='auto',
+            textposition='outside',
+            cliponaxis=False,
             textfont=dict(size=9.5, color='#2c3e50'),
             hovertemplate='<b>%{y}</b>: %{x:.1f}%<extra></extra>'
         )],
@@ -274,9 +276,9 @@ def create_surprise_chart(df, country_name):
                 text=f"All 17 Activities in {country_name} (24-Hour Bar Chart Race)",
                 font=dict(size=13, color="#2c3e50")
             ),
-            xaxis=dict(range=[0, 100], title="Share of Population (%)", showgrid=True, dtick=20),
+            xaxis=dict(range=[0, 110], title="Share of Population (%)", showgrid=True, dtick=20),
             yaxis=dict(showgrid=False, tickfont=dict(size=9.5), automargin=True),
-            margin=dict(l=10, r=20, t=35, b=45),
+            margin=dict(l=10, r=25, t=35, b=45),
             plot_bgcolor="white",
             paper_bgcolor="white",
             sliders=[dict(
@@ -387,7 +389,7 @@ navbar = dbc.Navbar(
                 ],
                 value="independent",
                 size="sm",
-                style={"width": "170px", "display": "inline-block", "marginRight": "10px"}
+                style={"width": "215px", "display": "inline-block", "marginRight": "10px"}
             ),
             
             # 3 & 8. Comparison Mode Dropdown
@@ -409,8 +411,7 @@ navbar = dbc.Navbar(
             dbc.Button(
                 "SWITCH to Bar Chart Race",
                 id="btn-surprise",
-                outline=True,
-                color="light",
+                color="warning",
                 size="sm",
                 className="rounded-pill shadow-sm",
                 style={"marginLeft": "16px", "marginRight": "16px", "whiteSpace": "nowrap"}
@@ -674,7 +675,7 @@ def sync_view_state(active_tab, surp_click, current_view):
         title = "Tempogram"
         tabs_style = {"display": "block"}
         btn_text = "SWITCH to Bar Chart Race"
-        btn_color = "light"
+        btn_color = "warning"
         compare_style = {"width": "170px", "display": "inline-block"}
         hover_options = [
             {"label": "Independent hover", "value": "independent"},
