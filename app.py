@@ -350,6 +350,7 @@ def create_surprise_chart(df, country_name):
 # ==============================================================================
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], suppress_callback_exceptions=True)
 app.title = "Time Use Dashboard"
+server = app.server  # Expose Flask server for Gunicorn on Render / production
 
 # Ensure precise fit to screen & responsive layout
 app.index_string = '''
