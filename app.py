@@ -112,7 +112,7 @@ ACTIVITY_DEFINITIONS = {
 
 def create_base_layout(title=""):
     return dict(
-        margin=dict(l=40, r=20, t=30, b=0),
+        margin=dict(l=45, r=20, t=30, b=0),
         xaxis=dict(
             rangeslider=dict(visible=True, thickness=0.1),
             type="date",
@@ -125,7 +125,7 @@ def create_base_layout(title=""):
             spikedash="dot",
             spikecolor="#e74c3c"
         ),
-        yaxis=dict(range=[0, 100], showgrid=True),
+        yaxis=dict(range=[0, 100], showgrid=True, ticksuffix="%"),
         hovermode="x unified",
         hoverlabel=dict(
             namelength=14,
@@ -173,7 +173,7 @@ def create_overview_chart(df):
     plot_stacked_area(fig, df)
     fig.update_layout(**create_base_layout())
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-    fig.update_yaxes(range=[0, 100])
+    fig.update_yaxes(range=[0, 100], ticksuffix="%")
     return fig
 
 def create_gender_chart(df_dict):
@@ -187,7 +187,7 @@ def create_gender_chart(df_dict):
     ]
     fig.update_layout(**layout)
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-    fig.update_yaxes(range=[0, 100])
+    fig.update_yaxes(range=[0, 100], ticksuffix="%")
     fig.update_layout(xaxis_rangeslider=dict(visible=True, thickness=0.05), 
                       xaxis2_rangeslider=dict(visible=True, thickness=0.05))
     return fig
@@ -213,7 +213,7 @@ def create_age_chart(df_dict):
     ]
     fig.update_layout(**layout)
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-    fig.update_yaxes(range=[0, 100])
+    fig.update_yaxes(range=[0, 100], ticksuffix="%")
     
     fig.update_layout(xaxis_rangeslider_visible=False, xaxis3_rangeslider=dict(visible=True, thickness=0.05))
     if has_65:
@@ -273,7 +273,7 @@ def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
 
     fig.update_layout(**create_base_layout())
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-    fig.update_yaxes(range=[0, 100])
+    fig.update_yaxes(range=[0, 100], ticksuffix="%")
     return fig
 
 def create_surprise_chart(df, country_name):
@@ -469,7 +469,7 @@ navbar = dbc.Navbar(
                 style={"marginLeft": "16px", "marginRight": "16px", "whiteSpace": "nowrap"}
             ),
             dbc.Button(
-                "Definitions",
+                "About",
                 id="btn-definitions",
                 color="info",
                 size="sm",
@@ -569,7 +569,7 @@ app.layout = html.Div([
         ])
     ]),
     
-    # Definitions Modal
+    # About & Definitions Modal
     dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle("Activity Definitions (Standardized 2022 Surveys)"), close_button=True),
         dbc.ModalBody([
@@ -587,9 +587,18 @@ app.layout = html.Div([
                 for act, desc in ACTIVITY_DEFINITIONS.items()
             ], style={"maxHeight": "60vh", "overflowY": "auto"})
         ]),
-        dbc.ModalFooter(
+        dbc.ModalFooter([
+            html.Small(
+                [
+                    "Made by ",
+                    html.Strong("Thuc (Thomas) Dao"),
+                    " | Data: Statistics Canada & World Bank (2022)"
+                ],
+                className="text-muted me-auto",
+                style={"fontSize": "0.85rem"}
+            ),
             dbc.Button("Close", id="btn-close-definitions", className="ms-auto", color="secondary", size="sm")
-        )
+        ])
     ], id="modal-definitions", size="lg", is_open=False, centered=True)
 ])
 
@@ -781,7 +790,7 @@ def update_figures(view_mode, selected_act, compare_mode, is_mobile, sub_view):
                     plot_stacked_area(fig, df_dict[(sub_view, )])
                     fig.update_layout(**create_base_layout())
                     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-                    fig.update_yaxes(range=[0, 100])
+                    fig.update_yaxes(range=[0, 100], ticksuffix="%")
                     return fig
                 else:
                     return create_gender_chart(df_dict)
@@ -794,7 +803,7 @@ def update_figures(view_mode, selected_act, compare_mode, is_mobile, sub_view):
                         plot_stacked_area(fig, df_dict[(sub_view, )])
                     fig.update_layout(**create_base_layout())
                     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-                    fig.update_yaxes(range=[0, 100])
+                    fig.update_yaxes(range=[0, 100], ticksuffix="%")
                     return fig
                 else:
                     return create_age_chart(df_dict)
