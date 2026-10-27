@@ -144,9 +144,9 @@ def create_base_layout(title=""):
                 x0="2022-01-01 00:00:00",
                 x1="2022-01-01 00:00:00",
                 y0=0,
-                y1=1,
+                y1=100,
                 xref="x",
-                yref="paper",
+                yref="y",
                 line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")
             )
         ]
@@ -182,8 +182,8 @@ def create_gender_chart(df_dict):
     plot_stacked_area(fig, df_dict[('Female',)], row=1, col=2)
     layout = create_base_layout()
     layout['shapes'] = [
-        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
-        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x2", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x", yref="y", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x2", yref="y2", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
     ]
     fig.update_layout(**layout)
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
@@ -205,12 +205,16 @@ def create_age_chart(df_dict):
         plot_stacked_area(fig, df_dict[('65 years and over',)], row=2, col=2)
         
     layout = create_base_layout()
-    layout['shapes'] = [
-        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
-        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x2", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
-        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x3", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
-        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=1, xref="x4", yref="paper", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
+    shapes = [
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x", yref="y", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x2", yref="y2", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
+        dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x3", yref="y3", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
     ]
+    if has_65:
+        shapes.append(
+            dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x4", yref="y4", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot"))
+        )
+    layout['shapes'] = shapes
     fig.update_layout(**layout)
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
     fig.update_yaxes(range=[0, 100], ticksuffix="%")
@@ -858,6 +862,7 @@ app.clientside_callback(
         
         const isCa = (prop_id === 'chart-ca.hoverData');
         const hoverData = isCa ? hoverCa : hoverVn;
+        const sourceGd = isCa ? gdCa : gdVn;
         const targetGd = isCa ? gdVn : gdCa;
         
         // Handle unhover (when mouse leaves, hoverData is null or empty)
@@ -879,25 +884,50 @@ app.clientside_callback(
         const pt = hoverData.points[0];
         const xVal = pt.x;
         const ptIdx = (typeof pt.pointNumber !== 'undefined') ? pt.pointNumber : pt.pointIndex;
+        const curveNum = pt.curveNumber;
+        
+        // Identify which subplot/xaxis was hovered on source chart
+        const sourceTrace = (sourceGd && sourceGd.data && typeof curveNum !== 'undefined') ? sourceGd.data[curveNum] : null;
+        const activeXAxis = (sourceTrace && sourceTrace.xaxis) ? sourceTrace.xaxis : 'x';
+        
+        // Find matching traces in target chart that belong to the SAME subplot/xaxis
+        const targetIndices = [];
+        if (targetGd && targetGd.data) {
+            for (let i = 0; i < targetGd.data.length; i++) {
+                const trX = targetGd.data[i].xaxis || 'x';
+                if (trX === activeXAxis) {
+                    targetIndices.push(i);
+                }
+            }
+        }
         
         window.__isSyncHovering = true;
         try {
-            // 1. Draw synchronized vertical guide line on target chart
+            // 1. Draw synchronized vertical guide line ONLY on the matching subplot of target
             const shapes = (targetGd.layout && targetGd.layout.shapes) ? targetGd.layout.shapes : [];
             if (shapes.length > 0) {
                 const updates = {};
                 for (let i = 0; i < shapes.length; i++) {
-                    updates['shapes[' + i + '].x0'] = xVal;
-                    updates['shapes[' + i + '].x1'] = xVal;
-                    updates['shapes[' + i + '].line.color'] = 'rgba(231, 76, 60, 0.9)';
+                    const sXRef = shapes[i].xref || 'x';
+                    if (sXRef === activeXAxis && targetIndices.length > 0) {
+                        updates['shapes[' + i + '].x0'] = xVal;
+                        updates['shapes[' + i + '].x1'] = xVal;
+                        updates['shapes[' + i + '].line.color'] = 'rgba(231, 76, 60, 0.9)';
+                    } else {
+                        updates['shapes[' + i + '].line.color'] = 'rgba(0,0,0,0)';
+                    }
                 }
                 window.Plotly.relayout(targetGd, updates);
             }
             
-            // 2. Trigger unified hover tooltip box on target chart
-            if (typeof ptIdx !== 'undefined' && targetGd.data && targetGd.data.length > 0) {
-                const pts = targetGd.data.map((_, i) => ({ curveNumber: i, pointNumber: ptIdx }));
-                window.Plotly.Fx.hover(targetGd, pts);
+            // 2. Trigger unified hover tooltip box on target chart for this corresponding subplot
+            if (targetIndices.length > 0 && typeof ptIdx !== 'undefined') {
+                const firstTr = targetGd.data[targetIndices[0]];
+                const targetSubplotId = (firstTr.xaxis || 'x') + (firstTr.yaxis || 'y');
+                const pts = targetIndices.map(idx => ({ curveNumber: idx, pointNumber: ptIdx }));
+                window.Plotly.Fx.hover(targetGd, pts, targetSubplotId);
+            } else {
+                window.Plotly.Fx.unhover(targetGd);
             }
         } catch(err) {
             console.warn('Sync hover error:', err);
