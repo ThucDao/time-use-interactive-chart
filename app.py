@@ -64,25 +64,25 @@ def reorder_data_columns(data):
 
 data_cache = reorder_data_columns(data_cache)
 
-# Statistics Canada-aligned color palette for all 17 categories
+# High-contrast color palette for all 17 categories (adjacent series have contrasting hues/luminance)
 COLORS = {
-    "Sleeping": "#212842",
-    "Personal care": "#44636d",
-    "Eating": "#82cdc6",
-    "Travelling": "#5c242c",
-    "Work": "#c45427",
-    "Sell goods or provide services": "#db7342",
-    "Education": "#e89566",
-    "Caring": "#e5a83b",
-    "Housework": "#266344",
-    "Shopping": "#43875d",
-    "Sport": "#6aa67e",
-    "Outdoor activities": "#8ec2a0",
-    "Active leisure": "#3c1737",
-    "Relaxing": "#642857",
-    "TV/Online videos": "#883770",
-    "Passive leisure": "#a1477d",
-    "Others": "#d6a8ce"
+    "Sleeping": "#1e293b",
+    "Personal care": "#f59e0b",
+    "Eating": "#059669",
+    "Travelling": "#e11d48",
+    "Work": "#2563eb",
+    "Sell goods or provide services": "#f97316",
+    "Education": "#7c3aed",
+    "Caring": "#06b6d4",
+    "Housework": "#b45309",
+    "Shopping": "#84cc16",
+    "Sport": "#db2777",
+    "Outdoor activities": "#166534",
+    "Active leisure": "#facc15",
+    "Relaxing": "#3730a3",
+    "TV/Online videos": "#ef4444",
+    "Passive leisure": "#14b8a6",
+    "Others": "#94a3b8"
 }
 
 # Standardized activity definitions
