@@ -105,6 +105,7 @@ def load_and_transform_data():
         return "Others"
 
     age_groups = ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
+    age_groups_bcr = ["15 to 24 years", "25 to 64 years"]
 
     # --------------------------------------------------------------------------
     # 4. TRANSFORMATION AND STANDARDIZATION
@@ -116,10 +117,11 @@ def load_and_transform_data():
         df_vn['activity_group'] = df_vn['activity_group'].apply(get_vn_activity)
         df_vn['gender'] = df_vn['gender'].map({1: "Male", 2: "Female"})
         df_vn['age_group'] = pd.cut(df_vn['age'], bins=[14, 34, 54, 64, 150], labels=age_groups)
+        df_vn['age_group_bcr'] = pd.cut(df_vn['age'], bins=[14, 24, 64], labels=age_groups_bcr)
         df_vn = df_vn.dropna(subset=['person_id', 'survey_minute', 'activity_group'])
     
     if not df_ca.empty:
-        df_ca = df_ca.rename(columns={"PUMFID": "person_id", "STARTMIN": "minute_of_day", "TUI_01": "activity_group", "GENDER2": "gender", "AGEGR10": "age_group"})
+        df_ca = df_ca.rename(columns={"PUMFID": "person_id", "STARTMIN": "minute_of_day", "TUI_01": "activity_group", "GENDER2": "gender", "AGEGR10": "age_raw"})
         df_ca['minute_of_day'] = pd.to_numeric(df_ca['minute_of_day'], errors='coerce')
         df_ca['survey_minute'] = (df_ca['minute_of_day'] - 240) % 1440
         df_ca['activity_group'] = df_ca['activity_group'].apply(map_ca_activity)
@@ -128,7 +130,11 @@ def load_and_transform_data():
                       3.0: "35 to 54 years", 4.0: "35 to 54 years", 
                       5.0: "55 to 64 years", 
                       6.0: "65 years and over", 7.0: "65 years and over"}
-        df_ca['age_group'] = df_ca['age_group'].map(ca_age_map)
+        ca_age_bcr_map = {1.0: "15 to 24 years",
+                          2.0: "25 to 64 years", 3.0: "25 to 64 years",
+                          4.0: "25 to 64 years", 5.0: "25 to 64 years"}
+        df_ca['age_group'] = df_ca['age_raw'].map(ca_age_map)
+        df_ca['age_group_bcr'] = df_ca['age_raw'].map(ca_age_bcr_map)
         df_ca = df_ca.dropna(subset=['person_id', 'survey_minute', 'activity_group'])
 
     return df_ca, df_vn
@@ -164,6 +170,12 @@ def aggregate_to_probabilities(df, group_by_cols=[]):
                     mock_groups[(g,)] = df_mock.div(df_mock.sum(axis=1), axis=0) * 100
             elif "age_group" in group_by_cols:
                 for a in ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]:
+                    df_mock = pd.DataFrame(index=time_index)
+                    for act in activities:
+                        df_mock[act] = np.sin(np.linspace(0, 4 * np.pi, 1440) + np.random.uniform(0, 2 * np.pi)) + 1.5
+                    mock_groups[(a,)] = df_mock.div(df_mock.sum(axis=1), axis=0) * 100
+            elif "age_group_bcr" in group_by_cols:
+                for a in ["15 to 24 years", "25 to 64 years"]:
                     df_mock = pd.DataFrame(index=time_index)
                     for act in activities:
                         df_mock[act] = np.sin(np.linspace(0, 4 * np.pi, 1440) + np.random.uniform(0, 2 * np.pi)) + 1.5
@@ -235,11 +247,16 @@ def get_dashboard_data():
     print("Aggregating by Age...")
     ca_age = aggregate_to_probabilities(df_ca, ['age_group'])
     vn_age = aggregate_to_probabilities(df_vn, ['age_group'])
+
+    print("Aggregating by Age (Bar Chart Race: 15-24, 25-64)...")
+    ca_age_bcr = aggregate_to_probabilities(df_ca.dropna(subset=['age_group_bcr']), ['age_group_bcr'])
+    vn_age_bcr = aggregate_to_probabilities(df_vn.dropna(subset=['age_group_bcr']), ['age_group_bcr'])
     
     return {
         'overview': (ca_overview, vn_overview),
         'gender': (ca_gender, vn_gender),
-        'age': (ca_age, vn_age)
+        'age': (ca_age, vn_age),
+        'age_bcr': (ca_age_bcr, vn_age_bcr)
     }
 
 if __name__ == "__main__":

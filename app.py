@@ -18,6 +18,11 @@ if os.path.exists(CACHE_FILE) and os.environ.get("REGENERATE_CACHE") != "1":
     print("Loading cached data...")
     with open(CACHE_FILE, "rb") as f:
         data_cache = pickle.load(f)
+    if "age_bcr" not in data_cache:
+        print("Upgrading cached data with Bar Chart Race age groups (15-24, 25-64)...")
+        data_cache = get_dashboard_data()
+        with open(CACHE_FILE, "wb") as f:
+            pickle.dump(data_cache, f)
 else:
     print("Processing data from scratch. This may take a few seconds...")
     data_cache = get_dashboard_data()
@@ -176,10 +181,70 @@ def create_overview_chart(df):
     fig.update_yaxes(range=[0, 100], ticksuffix="%")
     return fig
 
-def create_gender_chart(df_dict):
+def hex_to_rgba(hex_color, alpha=0.2):
+    hex_color = hex_color.lstrip('#')
+    r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+def add_isolated_traces(fig, df_main, df_other, activity, compare_mode, is_ca, row=None, col=None):
+    def _add(tr):
+        if row and col:
+            fig.add_trace(tr, row=row, col=col)
+        else:
+            fig.add_trace(tr)
+
+    if df_main is None or df_main.empty or activity not in df_main.columns:
+        return
+
+    if compare_mode == "separate" or df_other is None or df_other.empty or activity not in df_other.columns:
+        _add(go.Scatter(
+            x=df_main.index, y=df_main[activity],
+            name=activity, mode='lines',
+            line=dict(color=COLORS.get(activity, '#000')),
+            fill='tozeroy', fillcolor=hex_to_rgba(COLORS.get(activity, '#000000'), 0.6),
+            hovertemplate='%{fullData.name}: <b>%{y:.1f}%</b><extra></extra>'
+        ))
+    else:
+        main_name = "Canada" if is_ca else "Vietnam"
+        other_name = "Vietnam" if is_ca else "Canada"
+        
+        y_main = df_main[activity].values
+        y_other = df_other[activity].values
+        x_vals = df_main.index
+        
+        _add(go.Scatter(
+            x=x_vals, y=y_other, name=f"{other_name} ({activity})",
+            mode='lines', line=dict(color='gray', width=2),
+            hovertemplate='%{fullData.name}: <b>%{y:.1f}%</b><extra></extra>'
+        ))
+        
+        pos_y = np.where(y_main >= y_other, y_main, y_other)
+        neg_y = np.where(y_main < y_other, y_main, y_other)
+
+        _add(go.Scatter(x=x_vals, y=y_other, mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'))
+        _add(go.Scatter(
+            x=x_vals, y=pos_y, fill='tonexty', fillcolor='rgba(46, 204, 113, 0.4)', 
+            mode='lines', line=dict(width=0), name="Higher", hoverinfo='skip'
+        ))
+        _add(go.Scatter(x=x_vals, y=y_other, mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'))
+        _add(go.Scatter(
+            x=x_vals, y=neg_y, fill='tonexty', fillcolor='rgba(231, 76, 60, 0.4)', 
+            mode='lines', line=dict(width=0), name="Lower", hoverinfo='skip'
+        ))
+        _add(go.Scatter(
+            x=x_vals, y=y_main, name=f"{main_name} ({activity})",
+            mode='lines', line=dict(color=COLORS.get(activity, '#000'), width=3),
+            hovertemplate='%{fullData.name}: <b>%{y:.1f}%</b><extra></extra>'
+        ))
+
+def create_gender_chart(df_dict, df_other_dict=None, selected_act="Show All", compare_mode="separate", is_ca=True):
     fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.05, subplot_titles=("Male", "Female"))
-    plot_stacked_area(fig, df_dict[('Male',)], row=1, col=1)
-    plot_stacked_area(fig, df_dict[('Female',)], row=1, col=2)
+    if selected_act != "Show All" and selected_act in COLORS:
+        add_isolated_traces(fig, df_dict[('Male',)], df_other_dict[('Male',)] if df_other_dict else None, selected_act, compare_mode, is_ca, row=1, col=1)
+        add_isolated_traces(fig, df_dict[('Female',)], df_other_dict[('Female',)] if df_other_dict else None, selected_act, compare_mode, is_ca, row=1, col=2)
+    else:
+        plot_stacked_area(fig, df_dict[('Male',)], row=1, col=1)
+        plot_stacked_area(fig, df_dict[('Female',)], row=1, col=2)
     layout = create_base_layout()
     layout['shapes'] = [
         dict(type="line", x0="2022-01-01 00:00:00", x1="2022-01-01 00:00:00", y0=0, y1=100, xref="x", yref="y", line=dict(color="rgba(0,0,0,0)", width=2, dash="dot")),
@@ -192,17 +257,26 @@ def create_gender_chart(df_dict):
                       xaxis2_rangeslider=dict(visible=True, thickness=0.05))
     return fig
 
-def create_age_chart(df_dict):
+def create_age_chart(df_dict, df_other_dict=None, selected_act="Show All", compare_mode="separate", is_ca=True):
     fig = make_subplots(rows=2, cols=2, shared_yaxes=True, shared_xaxes=True, 
                         vertical_spacing=0.08, horizontal_spacing=0.05,
                         subplot_titles=("15-34", "35-54", "55-64", "65+"))
-    plot_stacked_area(fig, df_dict[('15 to 34 years',)], row=1, col=1)
-    plot_stacked_area(fig, df_dict[('35 to 54 years',)], row=1, col=2)
-    plot_stacked_area(fig, df_dict[('55 to 64 years',)], row=2, col=1)
-    
-    has_65 = not df_dict[('65 years and over',)].empty and df_dict[('65 years and over',)].sum().sum() > 0
-    if has_65:
-        plot_stacked_area(fig, df_dict[('65 years and over',)], row=2, col=2)
+    has_65 = ('65 years and over',) in df_dict and not df_dict[('65 years and over',)].empty and df_dict[('65 years and over',)].sum().sum() > 0
+
+    if selected_act != "Show All" and selected_act in COLORS:
+        add_isolated_traces(fig, df_dict[('15 to 34 years',)], df_other_dict[('15 to 34 years',)] if df_other_dict else None, selected_act, compare_mode, is_ca, row=1, col=1)
+        add_isolated_traces(fig, df_dict[('35 to 54 years',)], df_other_dict[('35 to 54 years',)] if df_other_dict else None, selected_act, compare_mode, is_ca, row=1, col=2)
+        add_isolated_traces(fig, df_dict[('55 to 64 years',)], df_other_dict[('55 to 64 years',)] if df_other_dict else None, selected_act, compare_mode, is_ca, row=2, col=1)
+        if has_65:
+            other_65 = df_other_dict.get(('65 years and over',)) if df_other_dict else None
+            has_other_65 = other_65 is not None and not other_65.empty and other_65.sum().sum() > 0
+            add_isolated_traces(fig, df_dict[('65 years and over',)], other_65 if has_other_65 else None, selected_act, compare_mode, is_ca, row=2, col=2)
+    else:
+        plot_stacked_area(fig, df_dict[('15 to 34 years',)], row=1, col=1)
+        plot_stacked_area(fig, df_dict[('35 to 54 years',)], row=1, col=2)
+        plot_stacked_area(fig, df_dict[('55 to 64 years',)], row=2, col=1)
+        if has_65:
+            plot_stacked_area(fig, df_dict[('65 years and over',)], row=2, col=2)
         
     layout = create_base_layout()
     shapes = [
@@ -233,120 +307,246 @@ def create_age_chart(df_dict):
 
 def create_isolated_chart(df_main, df_other, activity, compare_mode, is_ca):
     fig = go.Figure()
-    
-    if compare_mode == "separate":
-        fig.add_trace(go.Scatter(
-            x=df_main.index, y=df_main[activity],
-            name=activity, mode='lines',
-            line=dict(color=COLORS.get(activity, '#000')),
-            fill='tozeroy', fillcolor=COLORS.get(activity, '#000'),
-            opacity=0.6, hovertemplate='%{fullData.name}: <b>%{y:.1f}%</b><extra></extra>'
-        ))
-    else:
-        main_name = "Canada" if is_ca else "Vietnam"
-        other_name = "Vietnam" if is_ca else "Canada"
-        
-        y_main = df_main[activity].values
-        y_other = df_other[activity].values
-        x_vals = df_main.index
-        
-        fig.add_trace(go.Scatter(
-            x=x_vals, y=y_other, name=f"{other_name} ({activity})",
-            mode='lines', line=dict(color='gray', width=2),
-            hovertemplate='%{fullData.name}: <b>%{y:.1f}%</b><extra></extra>'
-        ))
-        
-        pos_y = np.where(y_main >= y_other, y_main, y_other)
-        neg_y = np.where(y_main < y_other, y_main, y_other)
-
-        fig.add_trace(go.Scatter(x=x_vals, y=y_other, mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'))
-        fig.add_trace(go.Scatter(
-            x=x_vals, y=pos_y, fill='tonexty', fillcolor='rgba(46, 204, 113, 0.4)', 
-            mode='lines', line=dict(width=0), name="Higher", hoverinfo='skip'
-        ))
-        fig.add_trace(go.Scatter(x=x_vals, y=y_other, mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'))
-        fig.add_trace(go.Scatter(
-            x=x_vals, y=neg_y, fill='tonexty', fillcolor='rgba(231, 76, 60, 0.4)', 
-            mode='lines', line=dict(width=0), name="Lower", hoverinfo='skip'
-        ))
-        fig.add_trace(go.Scatter(
-            x=x_vals, y=y_main, name=f"{main_name} ({activity})",
-            mode='lines', line=dict(color=COLORS.get(activity, '#000'), width=3),
-            hovertemplate='%{fullData.name}: <b>%{y:.1f}%</b><extra></extra>'
-        ))
-
+    add_isolated_traces(fig, df_main, df_other, activity, compare_mode, is_ca)
     fig.update_layout(**create_base_layout())
     fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
     fig.update_yaxes(range=[0, 100], ticksuffix="%")
     return fig
 
-def create_surprise_chart(df, country_name):
-    """ Animated horizontal bar chart race showing ALL 17 activity categories for country_name """
-    times = df.index[::15]  # 96 frames sampled every 15 minutes across 24h
-    
-    frames = []
-    for t in times:
-        row = df.loc[t]
-        sorted_row = row.sort_values(ascending=True) # Ascending order: highest at the top
-        acts = list(sorted_row.index)
-        vals = list(sorted_row.values)
-        colors = [COLORS.get(a, '#3498db') for a in acts]
-        texts = [f" {v:.1f}%" for v in vals]
-        
-        frames.append(go.Frame(
-            data=[go.Bar(
+def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode="separate", is_mobile=False, sub_view=None):
+    """
+    Animated horizontal bar chart race showing ALL 17 activity categories.
+    Supports:
+    - Overview, By Gender (Male, Female), and By Age (15-24, 25-64; excluding 65+)
+    - Highlighting a selected category while dimming other categories in the race
+    - Side-by-side vs. Overlay comparison when a category is selected
+    """
+    country_name = "Canada" if is_ca else "Vietnam"
+    other_country_name = "Vietnam" if is_ca else "Canada"
+    other_short = "VN" if is_ca else "CA"
+    df_ca_ov, df_vn_ov = data_cache['overview']
+
+    if tab_mode == "gender":
+        df_m_dict = data_cache['gender'][0] if is_ca else data_cache['gender'][1]
+        df_o_dict = data_cache['gender'][1] if is_ca else data_cache['gender'][0]
+        if is_mobile:
+            sv = sub_view if sub_view in ["Male", "Female"] else "Male"
+            panels = [(sv, df_m_dict[(sv,)], df_o_dict[(sv,)])]
+        else:
+            panels = [
+                ("Male", df_m_dict[('Male',)], df_o_dict[('Male',)]),
+                ("Female", df_m_dict[('Female',)], df_o_dict[('Female',)])
+            ]
+        subtitle_suffix = "By Gender"
+    elif tab_mode == "age":
+        df_m_dict = data_cache['age_bcr'][0] if is_ca else data_cache['age_bcr'][1]
+        df_o_dict = data_cache['age_bcr'][1] if is_ca else data_cache['age_bcr'][0]
+        if is_mobile:
+            sv = sub_view if sub_view in ["15 to 24 years", "25 to 64 years"] else "15 to 24 years"
+            lbl = "15-24" if sv == "15 to 24 years" else "25-64"
+            panels = [(lbl, df_m_dict[(sv,)], df_o_dict[(sv,)])]
+        else:
+            panels = [
+                ("15-24", df_m_dict[('15 to 24 years',)], df_o_dict[('15 to 24 years',)]),
+                ("25-64", df_m_dict[('25 to 64 years',)], df_o_dict[('25 to 64 years',)])
+            ]
+        subtitle_suffix = "By Age (15-24 vs 25-64)"
+    else:
+        df_m = df_ca_ov if is_ca else df_vn_ov
+        df_o = df_vn_ov if is_ca else df_ca_ov
+        panels = [("Overview", df_m, df_o)]
+        subtitle_suffix = "Overview"
+
+    is_isolated = (selected_act != "Show All" and selected_act in COLORS)
+    is_overlay = (is_isolated and compare_mode == "overlay")
+    is_two_col = (len(panels) == 2)
+    text_font_size = 8.0 if is_two_col else 9.5
+
+    times = panels[0][1].index[::15]  # 96 frames sampled every 15 minutes across 24h
+
+    def build_panel_traces(t, df_m, df_o, col_idx):
+        xaxis_ref = "x" if col_idx == 1 else f"x{col_idx}"
+        yaxis_ref = "y" if col_idx == 1 else f"y{col_idx}"
+        row_m = df_m.loc[t].sort_values(ascending=True)
+        acts = list(row_m.index)
+        vals = [float(v) for v in row_m.values]
+
+        if not is_isolated:
+            colors = [COLORS.get(a, '#3498db') for a in acts]
+            line_colors = ['white' for _ in acts]
+            line_widths = [0.5 for _ in acts]
+            texts = [f" {v:.1f}%" for v in vals]
+            return [go.Bar(
                 x=vals,
                 y=acts,
+                xaxis=xaxis_ref,
+                yaxis=yaxis_ref,
                 orientation='h',
-                marker=dict(color=colors, line=dict(color='white', width=0.5)),
+                marker=dict(color=colors, line=dict(color=line_colors, width=line_widths)),
                 text=texts,
                 textposition='outside',
                 cliponaxis=False,
-                textfont=dict(size=9.5, color='#2c3e50'),
-                hovertemplate='<b>%{y}</b>: %{x:.1f}%<extra></extra>'
-            )],
+                textfont=dict(size=text_font_size, color='#2c3e50'),
+                hovertemplate=f'<b>%{{y}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
+                showlegend=False
+            )]
+        elif not is_overlay:
+            # Side-by-side with selected category highlighted and other categories dimmed
+            colors = [
+                COLORS.get(a, '#3498db') if a == selected_act else hex_to_rgba(COLORS.get(a, '#3498db'), 0.18)
+                for a in acts
+            ]
+            line_colors = ['#0f172a' if a == selected_act else 'rgba(255,255,255,0.5)' for a in acts]
+            line_widths = [1.5 if a == selected_act else 0.5 for a in acts]
+            texts = [f" <b>{v:.1f}%</b>" if a == selected_act else f" {v:.1f}%" for a, v in zip(acts, vals)]
+            return [go.Bar(
+                x=vals,
+                y=acts,
+                xaxis=xaxis_ref,
+                yaxis=yaxis_ref,
+                orientation='h',
+                marker=dict(color=colors, line=dict(color=line_colors, width=line_widths)),
+                text=texts,
+                textposition='outside',
+                cliponaxis=False,
+                textfont=dict(size=text_font_size, color='#0f172a'),
+                hovertemplate=f'<b>%{{y}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
+                showlegend=False
+            )]
+        else:
+            # Overlay comparison: highlight selected category, dim other 16 categories, and overlay other country's bar on selected_act
+            other_val = float(df_o.loc[t, selected_act]) if (df_o is not None and not df_o.empty and selected_act in df_o.columns) else 0.0
+            colors = [
+                COLORS.get(a, '#3498db') if a == selected_act else hex_to_rgba(COLORS.get(a, '#3498db'), 0.18)
+                for a in acts
+            ]
+            line_colors = ['#0f172a' if a == selected_act else 'rgba(255,255,255,0.5)' for a in acts]
+            line_widths = [1.5 if a == selected_act else 0.5 for a in acts]
+            main_texts = []
+            overlay_texts = []
+            overlay_x = []
+            for a, v in zip(acts, vals):
+                if a == selected_act:
+                    overlay_x.append(other_val)
+                    comp_label = f" <b>{v:.1f}%</b> ({other_short}: {other_val:.1f}%)"
+                    if v >= other_val:
+                        main_texts.append(comp_label)
+                        overlay_texts.append("")
+                    else:
+                        main_texts.append("")
+                        overlay_texts.append(comp_label)
+                else:
+                    overlay_x.append(None)
+                    main_texts.append(f" {v:.1f}%")
+                    overlay_texts.append("")
+
+            trace_main = go.Bar(
+                x=vals,
+                y=acts,
+                xaxis=xaxis_ref,
+                yaxis=yaxis_ref,
+                name=f"{country_name} ({selected_act})",
+                orientation='h',
+                width=0.82,
+                marker=dict(color=colors, line=dict(color=line_colors, width=line_widths)),
+                text=main_texts,
+                textposition='outside',
+                cliponaxis=False,
+                textfont=dict(size=text_font_size, color='#0f172a'),
+                hovertemplate=f'<b>%{{y}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
+                showlegend=False
+            )
+            trace_other = go.Bar(
+                x=overlay_x,
+                y=acts,
+                xaxis=xaxis_ref,
+                yaxis=yaxis_ref,
+                name=f"{other_country_name} ({selected_act})",
+                orientation='h',
+                width=0.38,
+                marker=dict(color='rgba(15, 23, 42, 0.86)', line=dict(color='#ffffff', width=1.2)),
+                text=overlay_texts,
+                textposition='outside',
+                cliponaxis=False,
+                textfont=dict(size=text_font_size, color='#0f172a'),
+                hovertemplate=f'<b>%{{y}}</b> ({other_country_name} overlay): %{{x:.1f}}%<extra></extra>',
+                showlegend=False
+            )
+            return [trace_main, trace_other]
+
+    frames = []
+    for t in times:
+        frame_traces = []
+        for idx, (_, df_m, df_o) in enumerate(panels, start=1):
+            frame_traces.extend(build_panel_traces(t, df_m, df_o, idx))
+        frames.append(go.Frame(
+            data=frame_traces,
+            traces=list(range(len(frame_traces))),
             name=t.strftime("%H:%M")
         ))
-        
-    initial_row = df.loc[times[0]].sort_values(ascending=True)
-    initial_acts = list(initial_row.index)
-    initial_vals = list(initial_row.values)
-    initial_colors = [COLORS.get(a, '#3498db') for a in initial_acts]
-    initial_texts = [f" {v:.1f}%" for v in initial_vals]
-    
-    fig = go.Figure(
-        data=[go.Bar(
-            x=initial_vals,
-            y=initial_acts,
-            orientation='h',
-            marker=dict(color=initial_colors, line=dict(color='white', width=0.5)),
-            text=initial_texts,
-            textposition='outside',
-            cliponaxis=False,
-            textfont=dict(size=9.5, color='#2c3e50'),
-            hovertemplate='<b>%{y}</b>: %{x:.1f}%<extra></extra>'
-        )],
-        layout=go.Layout(
-            title=dict(
-                text=f"All 17 Activities in {country_name} (24-Hour Bar Chart Race)",
-                font=dict(size=13, color="#2c3e50")
-            ),
-            xaxis=dict(range=[0, 110], title="Share of Population (%)", showgrid=True, dtick=20),
-            yaxis=dict(showgrid=False, tickfont=dict(size=9.5), automargin=True),
-            margin=dict(l=10, r=25, t=35, b=45),
+
+    initial_traces = []
+    for idx, (_, df_m, df_o) in enumerate(panels, start=1):
+        initial_traces.extend(build_panel_traces(times[0], df_m, df_o, idx))
+
+    label_alias = {}
+    if is_two_col:
+        label_alias["Sell goods or provide services"] = "Sell goods/services"
+    if is_isolated:
+        disp = label_alias.get(selected_act, selected_act)
+        label_alias[selected_act] = f"▶ {disp}"
+
+    title_str = f"All 17 Activities in {country_name} — {subtitle_suffix}"
+    if is_isolated:
+        mode_lbl = f"Overlay vs. {other_country_name}" if is_overlay else "Highlighted"
+        title_str += f" [{selected_act}: {mode_lbl}]"
+
+    slider_cfg = [dict(
+        active=0,
+        x=0.0, y=-0.08,
+        len=1.0,
+        xanchor="left", yanchor="top",
+        currentvalue=dict(prefix="Time: ", font=dict(size=11, color="#2c3e50"), visible=True),
+        steps=[dict(method='animate', args=[[f.name], dict(mode='immediate', frame=dict(duration=100, redraw=True))], label=f.name) for f in frames]
+    )]
+
+    if is_two_col:
+        fig = make_subplots(
+            rows=1, cols=2,
+            shared_yaxes=False,
+            horizontal_spacing=0.25,
+            subplot_titles=(panels[0][0], panels[1][0])
+        )
+        for tr in initial_traces:
+            fig.add_trace(tr)
+        fig.update_layout(
+            title=dict(text=title_str, font=dict(size=12.5, color="#2c3e50")),
+            barmode='overlay',
+            xaxis=dict(range=[0, 118], title="Share (%)", showgrid=True, dtick=25, tickfont=dict(size=8.5)),
+            xaxis2=dict(range=[0, 118], title="Share (%)", showgrid=True, dtick=25, tickfont=dict(size=8.5)),
+            yaxis=dict(showgrid=False, tickfont=dict(size=8.0), automargin=True, labelalias=label_alias),
+            yaxis2=dict(showgrid=False, tickfont=dict(size=8.0), automargin=True, labelalias=label_alias),
+            margin=dict(l=10, r=25, t=42, b=45),
             plot_bgcolor="white",
             paper_bgcolor="white",
-            sliders=[dict(
-                active=0,
-                x=0.0, y=-0.08,
-                len=1.0,
-                xanchor="left", yanchor="top",
-                currentvalue=dict(prefix="Time: ", font=dict(size=11, color="#2c3e50"), visible=True),
-                steps=[dict(method='animate', args=[[f.name], dict(mode='immediate', frame=dict(duration=100, redraw=True))], label=f.name) for f in frames]
-            )]
-        ),
-        frames=frames
-    )
+            sliders=slider_cfg
+        )
+        fig.frames = frames
+    else:
+        fig = go.Figure(
+            data=initial_traces,
+            layout=go.Layout(
+                title=dict(text=title_str, font=dict(size=12.5, color="#2c3e50")),
+                barmode='overlay',
+                xaxis=dict(range=[0, 115], title="Share of Population (%)", showgrid=True, dtick=20),
+                yaxis=dict(showgrid=False, tickfont=dict(size=9.5), automargin=True, labelalias=label_alias),
+                margin=dict(l=10, r=25, t=35, b=45),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                sliders=slider_cfg
+            ),
+            frames=frames
+        )
     return fig
 
 # ==============================================================================
@@ -357,7 +557,7 @@ app.title = "Time Use Dashboard"
 server = app.server  # Expose Flask server for Gunicorn on Render / production
 
 # Ensure precise fit to screen & responsive layout
-app.index_string = '''
+app.index_string = r'''
 <!DOCTYPE html>
 <html>
     <head>
@@ -372,12 +572,38 @@ app.index_string = '''
             .card-body { flex-grow: 1; padding: 10px; display: flex; flex-direction: column; min-height: 0; }
             .graph-container { flex-grow: 1; min-height: 0; position: relative; }
             .legend-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; padding: 5px; max-height: 80px; overflow-y: auto;}
-            .legend-btn { font-size: 0.75rem; padding: 2px 6px; border: none; border-radius: 12px; cursor: pointer; color: white;}
+            .legend-btn { font-size: 0.75rem; padding: 2px 6px; border: none; border-radius: 12px; cursor: pointer; color: white; transition: transform 0.1s, opacity 0.15s;}
             .main-row { height: calc(100vh - 60px); margin: 0; padding: 10px; }
             .col-card { height: 100%; padding: 5px; }
             .card-header-title { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
             .btn-compact { white-space: nowrap !important; }
             .bcr-controls { display: none; }
+
+            /* Frozen / disabled state for compare-mode dropdown */
+            select#compare-mode:disabled {
+                background-color: #cbd5e1 !important;
+                color: #64748b !important;
+                opacity: 0.65 !important;
+                cursor: not-allowed !important;
+                border-color: #94a3b8 !important;
+            }
+
+            /* Clickable y-axis category labels in Bar Chart Race */
+            .bcr-mode #chart-ca .ytick text,
+            .bcr-mode #chart-ca .y2tick text,
+            .bcr-mode #chart-vn .ytick text,
+            .bcr-mode #chart-vn .y2tick text {
+                pointer-events: all !important;
+                cursor: pointer !important;
+            }
+            .bcr-mode #chart-ca .ytick text:hover,
+            .bcr-mode #chart-ca .y2tick text:hover,
+            .bcr-mode #chart-vn .ytick text:hover,
+            .bcr-mode #chart-vn .y2tick text:hover {
+                font-weight: 700 !important;
+                fill: #2563eb !important;
+                text-decoration: underline;
+            }
             
             /* Compact unified hover tooltip box (< 50% chart width, compact height) */
             .hoverlayer .hovertext {
@@ -404,6 +630,29 @@ app.index_string = '''
                 html, body { overflow: auto !important; height: auto !important; }
             }
         </style>
+        <script>
+            document.addEventListener('click', function(e) {
+                const tickText = e.target.closest('#chart-ca .ytick text, #chart-ca .y2tick text, #chart-vn .ytick text, #chart-vn .y2tick text');
+                if (!tickText) return;
+                let rawLabel = (tickText.textContent || '').trim();
+                rawLabel = rawLabel.replace(/^▶\s*/, '').trim();
+                const aliasMap = {
+                    "Sell goods/services": "Sell goods or provide services"
+                };
+                const act = aliasMap[rawLabel] || rawLabel;
+                const validActs = [
+                    "Sleeping", "Personal care", "Eating", "Travelling",
+                    "Work", "Sell goods or provide services", "Education",
+                    "Caring", "Housework", "Shopping",
+                    "Sport", "Outdoor activities", "Active leisure",
+                    "Relaxing", "TV/Online videos", "Passive leisure",
+                    "Others"
+                ];
+                if (validActs.includes(act) && window.dash_clientside && window.dash_clientside.set_props) {
+                    window.dash_clientside.set_props('bcr-yaxis-clicked', {data: {act: act, ts: Date.now()}});
+                }
+            });
+        </script>
     </head>
     <body>
         {%app_entry%}
@@ -431,7 +680,7 @@ navbar = dbc.Navbar(
                             dbc.Tab(label="By Gender", tab_id="gender"),
                             dbc.Tab(label="By Age", tab_id="age"),
                         ],
-                        className="me-3"
+                        className="me-2"
                     )
                 ]
             ),
@@ -445,20 +694,35 @@ navbar = dbc.Navbar(
                 ],
                 value="independent",
                 size="sm",
-                style={"width": "215px", "display": "inline-block", "marginRight": "10px"}
+                style={"width": "185px", "display": "inline-block", "marginRight": "8px"}
             ),
             
-            # 3 & 8. Comparison Mode Dropdown
-            dbc.Select(
-                id="compare-mode",
-                options=[
-                    {"label": "Side-by-side", "value": "separate"},
-                    {"label": "Overlay comparison", "value": "overlay"}
-                ],
-                value="separate",
-                size="sm",
-                style={"width": "170px", "display": "inline-block"}
-            )
+            # 3 & 8. Comparison Mode Dropdown (frozen by default until a category is selected) + Note
+            html.Div([
+                dbc.Select(
+                    id="compare-mode",
+                    options=[
+                        {"label": "Side-by-side", "value": "separate"},
+                        {"label": "Overlay comparison", "value": "overlay"}
+                    ],
+                    value="separate",
+                    disabled=True,
+                    size="sm",
+                    style={"width": "160px", "display": "inline-block", "flexShrink": "0"}
+                ),
+                html.Small(
+                    "Click a category in the legend to unlock.",
+                    id="compare-mode-note",
+                    className="text-light ms-2",
+                    style={
+                        "fontSize": "0.72rem",
+                        "lineHeight": "1.15",
+                        "maxWidth": "200px",
+                        "opacity": "0.9",
+                        "display": "inline-block"
+                    }
+                )
+            ], className="d-flex align-items-center")
         ], className="d-flex align-items-center"),
         
         # Right-side action buttons
@@ -470,7 +734,7 @@ navbar = dbc.Navbar(
                 color="warning",
                 size="sm",
                 className="rounded-pill shadow-sm",
-                style={"marginLeft": "16px", "marginRight": "16px", "whiteSpace": "nowrap"}
+                style={"marginLeft": "12px", "marginRight": "12px", "whiteSpace": "nowrap"}
             ),
             dbc.Button(
                 "About",
@@ -505,9 +769,10 @@ def render_legend(country_id):
         ))
     return html.Div(buttons, className="legend-container")
 
-app.layout = html.Div([
-    dcc.Store(id='current-view', data='overview'),
+app.layout = html.Div(id="app-root", className="tempogram-mode", children=[
+    dcc.Store(id='current-view', data='tempogram'),
     dcc.Store(id='selected-activity', data='Show All'),
+    dcc.Store(id='bcr-yaxis-clicked', data=None),
     dcc.Store(id='is-mobile', data=False),
     dcc.Store(id='mobile-sub-view', data='Male'),
     html.Div(id="dummy-resize-trigger", style={"display": "none"}),
@@ -619,17 +884,24 @@ app.layout = html.Div([
 def toggle_modal(n_open, n_close, is_open):
     return not is_open
 
-# Show All Visibility
+# Show All Visibility & Compare Mode Dropdown Freeze/Unfreeze
 @app.callback(
-    [Output("btn-show-all-ca", "style"), Output("btn-show-all-vn", "style")],
-    Input("selected-activity", "data")
+    [
+        Output("btn-show-all-ca", "style"),
+        Output("btn-show-all-vn", "style"),
+        Output("compare-mode", "disabled"),
+        Output("compare-mode", "value")
+    ],
+    Input("selected-activity", "data"),
+    State("compare-mode", "value")
 )
-def toggle_show_all(selected_act):
-    if selected_act == "Show All":
+def toggle_show_all_and_compare_mode(selected_act, current_compare):
+    if not selected_act or selected_act == "Show All":
         style = {"display": "none"}
+        return style, style, True, "separate"
     else:
         style = {"display": "inline-block", "whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"}
-    return style, style
+        return style, style, False, (current_compare or "separate")
 
 # Mobile Width Detection
 app.clientside_callback(
@@ -647,116 +919,154 @@ app.clientside_callback(
     [Output("mobile-nav-ca", "children"), Output("mobile-nav-vn", "children"),
      Output("mobile-nav-ca", "style"), Output("mobile-nav-vn", "style"),
      Output("mobile-sub-view", "data")],
-    [Input("current-view", "data"), Input("is-mobile", "data"),
+    [Input("current-view", "data"), Input("view-tabs", "active_tab"), Input("is-mobile", "data"),
      Input({"type": "nav-link", "view": dash.ALL}, "n_clicks")],
     [State("mobile-sub-view", "data")]
 )
-def update_mobile_nav(view_mode, is_mobile, n_clicks_list, current_sub):
-    if not is_mobile or view_mode not in ["gender", "age"]:
+def update_mobile_nav(chart_mode, active_tab, is_mobile, n_clicks_list, current_sub):
+    tab_mode = active_tab or "overview"
+    if not is_mobile or tab_mode not in ["gender", "age"]:
         return None, None, {"display": "none"}, {"display": "none"}, current_sub
         
     if ctx.triggered_id and isinstance(ctx.triggered_id, dict):
         new_view = ctx.triggered_id.get("view")
-        if new_view: current_sub = new_view
+        if new_view:
+            current_sub = new_view
         
-    if view_mode == "gender" and current_sub not in ["Male", "Female"]:
-        current_sub = "Male"
-    elif view_mode == "age" and current_sub not in ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]:
-        current_sub = "15 to 34 years"
+    if tab_mode == "gender":
+        if current_sub not in ["Male", "Female"]:
+            current_sub = "Male"
+    elif tab_mode == "age":
+        if chart_mode == "surprise":
+            if current_sub not in ["15 to 24 years", "25 to 64 years"]:
+                current_sub = "15 to 24 years"
+        else:
+            if current_sub not in ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]:
+                current_sub = "15 to 34 years"
         
     nav_style = {"display": "flex", "justifyContent": "space-between", "alignItems": "center", "fontWeight": "bold", "marginBottom": "5px", "padding": "0 10px"}
     
     def render_nav(sub):
-        if view_mode == "gender":
+        if tab_mode == "gender":
             left = html.Span("< Male", id={"type": "nav-link", "view": "Male"}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "left"}) if sub == "Female" else html.Span("", style={"flex": "1"})
             right = html.Span("Female >", id={"type": "nav-link", "view": "Female"}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "right"}) if sub == "Male" else html.Span("", style={"flex": "1"})
             title = html.Span("Female" if sub == "Female" else "Male", style={"flex": "1", "textAlign": "center"})
             return [left, title, right]
             
-        elif view_mode == "age":
-            ages = ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
-            labels = ["15-34", "35-54", "55-64", "65+"]
+        elif tab_mode == "age":
+            if chart_mode == "surprise":
+                ages = ["15 to 24 years", "25 to 64 years"]
+                labels = ["15-24", "25-64"]
+            else:
+                ages = ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
+                labels = ["15-34", "35-54", "55-64", "65+"]
             idx = ages.index(sub)
+            max_idx = len(ages) - 1
             
             left = html.Span(f"< {labels[idx-1]}", id={"type": "nav-link", "view": ages[idx-1]}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "left"}) if idx > 0 else html.Span("", style={"flex": "1"})
-            right = html.Span(f"{labels[idx+1]} >", id={"type": "nav-link", "view": ages[idx+1]}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "right"}) if idx < 3 else html.Span("", style={"flex": "1"})
+            right = html.Span(f"{labels[idx+1]} >", id={"type": "nav-link", "view": ages[idx+1]}, style={"cursor": "pointer", "color": "#3498db", "flex": "1", "textAlign": "right"}) if idx < max_idx else html.Span("", style={"flex": "1"})
             title = html.Span(labels[idx], style={"flex": "1", "textAlign": "center"})
             return [left, title, right]
             
     content = render_nav(current_sub)
     return content, content, nav_style, nav_style, current_sub
 
-# Legend Click Handler
+# Category Selection Handler (Tempogram Legend, Bar Chart Race y-axis labels / bars, and Show All buttons)
 @app.callback(
     Output('selected-activity', 'data'),
-    [Input({'type': 'legend-btn', 'act': dash.ALL, 'country': dash.ALL}, 'n_clicks'),
-     Input('btn-show-all-ca', 'n_clicks'), Input('btn-show-all-vn', 'n_clicks')],
+    [
+        Input({'type': 'legend-btn', 'act': dash.ALL, 'country': dash.ALL}, 'n_clicks'),
+        Input('btn-show-all-ca', 'n_clicks'),
+        Input('btn-show-all-vn', 'n_clicks'),
+        Input('bcr-yaxis-clicked', 'data'),
+        Input('chart-ca', 'clickData'),
+        Input('chart-vn', 'clickData')
+    ],
+    [
+        State('selected-activity', 'data'),
+        State('current-view', 'data')
+    ],
     prevent_initial_call=True
 )
-def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks):
+def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks, bcr_yaxis_data, ca_click_data, vn_click_data, current_selected, chart_mode):
     if not ctx.triggered:
         return dash.no_update
     btn_id = ctx.triggered_id
     if btn_id in ["btn-show-all-ca", "btn-show-all-vn"]:
         return "Show All"
     if isinstance(btn_id, dict):
-        return btn_id['act']
+        clicked_act = btn_id.get('act')
+        if clicked_act:
+            return "Show All" if clicked_act == current_selected else clicked_act
+    if btn_id == "bcr-yaxis-clicked" and isinstance(bcr_yaxis_data, dict):
+        clicked_act = bcr_yaxis_data.get("act")
+        if clicked_act in COLORS:
+            return "Show All" if clicked_act == current_selected else clicked_act
+    if btn_id in ["chart-ca", "chart-vn"] and chart_mode == "surprise":
+        click_payload = ca_click_data if btn_id == "chart-ca" else vn_click_data
+        if click_payload and click_payload.get("points"):
+            clicked_act = click_payload["points"][0].get("y")
+            if clicked_act in COLORS:
+                return "Show All" if clicked_act == current_selected else clicked_act
     return dash.no_update
 
 # 3, 4, 5, 8, 9, 10, 11, 12, 13: Unified View & State Synchronization
 @app.callback(
     [
         Output("current-view", "data"),
+        Output("app-root", "className"),
         Output("chart-type-title", "children"),
         Output("tabs-container", "style"),
         Output("btn-surprise", "children"),
         Output("btn-surprise", "color"),
-        Output("compare-mode", "style"),
         Output("hover-mode", "options"),
+        Output("compare-mode-note", "children"),
         Output("legend-container-ca", "style"),
         Output("legend-container-vn", "style"),
         Output("bcr-controls-ca", "style"),
         Output("bcr-controls-vn", "style"),
     ],
-    [Input("view-tabs", "active_tab"), Input("btn-surprise", "n_clicks")],
+    [Input("btn-surprise", "n_clicks")],
     [State("current-view", "data")],
     prevent_initial_call=False
 )
-def sync_view_state(active_tab, surp_click, current_view):
+def sync_view_state(surp_click, current_view):
     trig = ctx.triggered_id
     
     # Toggle between Bar Chart Race and Tempogram
     if trig == "btn-surprise":
         is_surprise = (current_view != "surprise")
     else:
-        is_surprise = False
+        is_surprise = (current_view == "surprise")
         
+    tabs_style = {"display": "block"}
+
     if is_surprise:
         # Bar Chart Race Active
         new_view = "surprise"
+        root_class = "bcr-mode"
         title = "Bar Chart Race"
-        tabs_style = {"display": "none"}
         btn_text = "SWITCH to Tempogram"
         btn_color = "warning"
-        compare_style = {"display": "none"}
         hover_options = [
             {"label": "Independent animation", "value": "independent"},
             {"label": "Synced animation", "value": "parallel"}
         ]
+        compare_note = "Click a category in the vertical axis to unlock"
         legend_style = {"display": "none"}
         bcr_style = {"display": "flex", "alignItems": "center"}
     else:
         # Tempogram Active
-        new_view = active_tab or "overview"
+        new_view = "tempogram"
+        root_class = "tempogram-mode"
         title = "Tempogram"
-        tabs_style = {"display": "block"}
         btn_text = "SWITCH to Bar Chart Race"
         btn_color = "warning"
-        compare_style = {"width": "170px", "display": "inline-block"}
         hover_options = [
             {"label": "Independent hover", "value": "independent"},
             {"label": "Synced hover", "value": "parallel"}
         ]
+        compare_note = "Click a category in the legend to unlock."
         legend_style = {
             "display": "flex", "flexWrap": "wrap", "justifyContent": "center",
             "gap": "5px", "padding": "5px", "maxHeight": "80px", "overflowY": "auto"
@@ -764,55 +1074,80 @@ def sync_view_state(active_tab, surp_click, current_view):
         bcr_style = {"display": "none"}
         
     return (
-        new_view, title, tabs_style, btn_text, btn_color,
-        compare_style, hover_options, legend_style, legend_style,
+        new_view, root_class, title, tabs_style, btn_text, btn_color,
+        hover_options, compare_note, legend_style, legend_style,
         bcr_style, bcr_style
     )
 
 # Chart Updater
 @app.callback(
     [Output("chart-ca", "figure"), Output("chart-vn", "figure")],
-    [Input("current-view", "data"), Input("selected-activity", "data"), Input("compare-mode", "value"),
-     Input("is-mobile", "data"), Input("mobile-sub-view", "data")]
+    [
+        Input("current-view", "data"),
+        Input("view-tabs", "active_tab"),
+        Input("selected-activity", "data"),
+        Input("compare-mode", "value"),
+        Input("is-mobile", "data"),
+        Input("mobile-sub-view", "data")
+    ]
 )
-def update_figures(view_mode, selected_act, compare_mode, is_mobile, sub_view):
+def update_figures(chart_mode, active_tab, selected_act, compare_mode, is_mobile, sub_view):
+    tab_mode = active_tab or "overview"
     df_ca_ov, df_vn_ov = data_cache['overview']
     
     def get_fig(is_ca):
-        country_name = "Canada" if is_ca else "Vietnam"
         df_ov = df_ca_ov if is_ca else df_vn_ov
+        df_other_ov = df_vn_ov if is_ca else df_ca_ov
         
-        if selected_act != "Show All" and view_mode != "surprise":
-            return create_isolated_chart(df_ov, df_vn_ov if is_ca else df_ca_ov, selected_act, compare_mode, is_ca)
-        else:
-            if view_mode == "overview":
-                return create_overview_chart(df_ov)
-            elif view_mode == "gender":
-                df_dict = data_cache['gender'][0] if is_ca else data_cache['gender'][1]
-                if is_mobile:
-                    fig = go.Figure()
-                    plot_stacked_area(fig, df_dict[(sub_view, )])
-                    fig.update_layout(**create_base_layout())
-                    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-                    fig.update_yaxes(range=[0, 100], ticksuffix="%")
-                    return fig
-                else:
-                    return create_gender_chart(df_dict)
-            elif view_mode == "age":
-                df_dict = data_cache['age'][0] if is_ca else data_cache['age'][1]
-                if is_mobile:
-                    fig = go.Figure()
-                    has_data = not df_dict[(sub_view, )].empty and df_dict[(sub_view, )].sum().sum() > 0
-                    if has_data:
-                        plot_stacked_area(fig, df_dict[(sub_view, )])
-                    fig.update_layout(**create_base_layout())
-                    fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
-                    fig.update_yaxes(range=[0, 100], ticksuffix="%")
-                    return fig
-                else:
-                    return create_age_chart(df_dict)
-            elif view_mode == "surprise":
-                return create_surprise_chart(df_ov, country_name)
+        if chart_mode == "surprise":
+            return create_surprise_chart(
+                tab_mode=tab_mode,
+                is_ca=is_ca,
+                selected_act=selected_act,
+                compare_mode=compare_mode,
+                is_mobile=is_mobile,
+                sub_view=sub_view
+            )
+
+        # Tempogram Mode
+        if tab_mode == "overview":
+            if selected_act != "Show All" and selected_act in COLORS:
+                return create_isolated_chart(df_ov, df_other_ov, selected_act, compare_mode, is_ca)
+            return create_overview_chart(df_ov)
+        elif tab_mode == "gender":
+            df_dict = data_cache['gender'][0] if is_ca else data_cache['gender'][1]
+            df_other_dict = data_cache['gender'][1] if is_ca else data_cache['gender'][0]
+            if is_mobile:
+                sv = sub_view if sub_view in ["Male", "Female"] else "Male"
+                if selected_act != "Show All" and selected_act in COLORS:
+                    return create_isolated_chart(df_dict[(sv,)], df_other_dict[(sv,)], selected_act, compare_mode, is_ca)
+                fig = go.Figure()
+                plot_stacked_area(fig, df_dict[(sv,)])
+                fig.update_layout(**create_base_layout())
+                fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+                fig.update_yaxes(range=[0, 100], ticksuffix="%")
+                return fig
+            else:
+                return create_gender_chart(df_dict, df_other_dict, selected_act, compare_mode, is_ca)
+        elif tab_mode == "age":
+            df_dict = data_cache['age'][0] if is_ca else data_cache['age'][1]
+            df_other_dict = data_cache['age'][1] if is_ca else data_cache['age'][0]
+            if is_mobile:
+                sv = sub_view if sub_view in ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"] else "15 to 34 years"
+                has_data = not df_dict[(sv,)].empty and df_dict[(sv,)].sum().sum() > 0
+                if selected_act != "Show All" and selected_act in COLORS and has_data:
+                    other_df = df_other_dict.get((sv,))
+                    has_other = other_df is not None and not other_df.empty and other_df.sum().sum() > 0
+                    return create_isolated_chart(df_dict[(sv,)], other_df if has_other else None, selected_act, compare_mode, is_ca)
+                fig = go.Figure()
+                if has_data:
+                    plot_stacked_area(fig, df_dict[(sv,)])
+                fig.update_layout(**create_base_layout())
+                fig.update_xaxes(tickformat="%H:%M", hoverformat="%H:%M")
+                fig.update_yaxes(range=[0, 100], ticksuffix="%")
+                return fig
+            else:
+                return create_age_chart(df_dict, df_other_dict, selected_act, compare_mode, is_ca)
         return go.Figure()
         
     return get_fig(True), get_fig(False)
@@ -951,15 +1286,15 @@ app.clientside_callback(
 # 5 & 6: Bar Chart Race Play/Pause & Animation Synchronization
 app.clientside_callback(
     """
-    function(caClicks, vnClicks, currentView, animMode, caText, vnText) {
+    function(caClicks, vnClicks, currentView, activeTab, selectedAct, compareMode, animMode, caText, vnText) {
         const tr = window.dash_clientside.callback_context.triggered;
         if (!tr || !tr.length) return [caText || "▶ Play", "primary", vnText || "▶ Play", "primary"];
         
         const prop_id = tr[0].prop_id;
         const triggeredId = prop_id.split('.')[0];
         
-        // Reset buttons when view changes
-        if (triggeredId === 'current-view') {
+        // Reset buttons when view, tab, selected category, or compare mode changes (since figure is recreated)
+        if (['current-view', 'view-tabs', 'selected-activity', 'compare-mode'].includes(triggeredId)) {
             return ["▶ Play", "primary", "▶ Play", "primary"];
         }
         
@@ -1021,7 +1356,10 @@ app.clientside_callback(
     [
         Input("btn-play-ca", "n_clicks"),
         Input("btn-play-vn", "n_clicks"),
-        Input("current-view", "data")
+        Input("current-view", "data"),
+        Input("view-tabs", "active_tab"),
+        Input("selected-activity", "data"),
+        Input("compare-mode", "value")
     ],
     [
         State("hover-mode", "value"),
