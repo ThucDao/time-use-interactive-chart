@@ -1,0 +1,59 @@
+/* Modern Segmented Pill Tabs in Navbar */
+#tabs-container .nav,
+#tabs-container .nav-tabs,
+#view-tabs {
+    background: rgba(8, 35, 20, 0.42) !important;
+    padding: 4px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-bottom: 0 !important;
+}
+
+#tabs-container .nav-item,
+#view-tabs .nav-item {
+    margin-bottom: 0 !important;
+}
+
+#tabs-container .nav-link,
+#view-tabs .nav-link {
+    border: none !important;
+    border-radius: 999px !important;
+    padding: 5px 15px !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.015em !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    background: transparent !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+}
+
+#tabs-container .nav-link:hover:not(.active),
+#view-tabs .nav-link:hover:not(.active) {
+    color: #ffffff !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+}
+
+#tabs-container .nav-link.active,
+#view-tabs .nav-link.active {
+    background: linear-gradient(180deg, #ffffff 0%, #dcfce7 100%) !important;
+    color: #14532d !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* Frozen / disabled state for compare-mode dropdown */
+select#compare-mode:disabled {
+    background-color: #cbd5e1 !important;
+    color: #64748b !important;
+    opacity: 0.65 !important;
+    cursor: not-allowed !important;
+    border-color: #94a3b8 !important;
+}
+

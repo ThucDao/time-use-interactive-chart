@@ -464,7 +464,7 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
                 name=f"{other_country_name} ({selected_act})",
                 orientation='h',
                 width=0.38,
-                marker=dict(color='rgba(15, 23, 42, 0.86)', line=dict(color='#ffffff', width=1.2)),
+                marker=dict(color='#ffffff', line=dict(color='#334155', width=1.5)),
                 text=overlay_texts,
                 textposition='outside',
                 cliponaxis=False,
@@ -506,8 +506,16 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
         x=0.0, y=-0.08,
         len=1.0,
         xanchor="left", yanchor="top",
+        transition=dict(duration=0),
         currentvalue=dict(prefix="Time: ", font=dict(size=11, color="#2c3e50"), visible=True),
-        steps=[dict(method='animate', args=[[f.name], dict(mode='immediate', frame=dict(duration=100, redraw=True))], label=f.name) for f in frames]
+        steps=[
+            dict(
+                method='animate',
+                args=[[f.name], dict(mode='immediate', frame=dict(duration=0, redraw=True), transition=dict(duration=0))],
+                label=f.name
+            )
+            for f in frames
+        ]
     )]
 
     if is_two_col:
@@ -578,6 +586,52 @@ app.index_string = r'''
             .card-header-title { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
             .btn-compact { white-space: nowrap !important; }
             .bcr-controls { display: none; }
+
+            /* Modern Segmented Pill Tabs in Navbar */
+            #tabs-container .nav,
+            #tabs-container .nav-tabs,
+            #view-tabs {
+                background: rgba(8, 35, 20, 0.42) !important;
+                padding: 4px !important;
+                border-radius: 999px !important;
+                border: 1px solid rgba(255, 255, 255, 0.28) !important;
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 4px !important;
+                margin-bottom: 0 !important;
+            }
+            #tabs-container .nav-item,
+            #view-tabs .nav-item {
+                margin-bottom: 0 !important;
+            }
+            #tabs-container .nav-link,
+            #view-tabs .nav-link {
+                border: none !important;
+                border-radius: 999px !important;
+                padding: 5px 15px !important;
+                font-size: 0.82rem !important;
+                font-weight: 600 !important;
+                letter-spacing: 0.015em !important;
+                color: rgba(255, 255, 255, 0.85) !important;
+                background: transparent !important;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                line-height: 1.25 !important;
+                white-space: nowrap !important;
+                cursor: pointer !important;
+            }
+            #tabs-container .nav-link:hover:not(.active),
+            #view-tabs .nav-link:hover:not(.active) {
+                color: #ffffff !important;
+                background: rgba(255, 255, 255, 0.16) !important;
+            }
+            #tabs-container .nav-link.active,
+            #view-tabs .nav-link.active {
+                background: linear-gradient(180deg, #ffffff 0%, #dcfce7 100%) !important;
+                color: #14532d !important;
+                font-weight: 700 !important;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
+            }
 
             /* Frozen / disabled state for compare-mode dropdown */
             select#compare-mode:disabled {
@@ -694,7 +748,7 @@ navbar = dbc.Navbar(
                 ],
                 value="independent",
                 size="sm",
-                style={"width": "185px", "display": "inline-block", "marginRight": "8px"}
+                style={"width": "190px", "display": "inline-block", "marginRight": "8px", "flexShrink": "0"}
             ),
             
             # 3 & 8. Comparison Mode Dropdown (frozen by default until a category is selected) + Note
@@ -708,7 +762,7 @@ navbar = dbc.Navbar(
                     value="separate",
                     disabled=True,
                     size="sm",
-                    style={"width": "160px", "display": "inline-block", "flexShrink": "0"}
+                    style={"width": "170px", "display": "inline-block", "flexShrink": "0"}
                 ),
                 html.Small(
                     "← To unlock, select a category\nin the legend.",
@@ -746,9 +800,12 @@ navbar = dbc.Navbar(
             )
         ], className="d-flex align-items-center ms-auto")
     ], fluid=True),
-    color="primary",
     dark=True,
-    style={"height": "60px"}
+    style={
+        "height": "60px",
+        "background": "linear-gradient(90deg, #14532d 0%, #166534 55%, #15803d 100%)",
+        "boxShadow": "0 2px 8px rgba(0, 0, 0, 0.15)"
+    }
 )
 
 def get_text_color(hex_color):
@@ -1285,68 +1342,7 @@ app.clientside_callback(
 
 # 5 & 6: Bar Chart Race Play/Pause & Animation Synchronization
 app.clientside_callback(
-    """
-    function(caClicks, vnClicks, currentView, activeTab, selectedAct, compareMode, animMode, caText, vnText) {
-        const tr = window.dash_clientside.callback_context.triggered;
-        if (!tr || !tr.length) return [caText || "▶ Play", "primary", vnText || "▶ Play", "primary"];
-        
-        const prop_id = tr[0].prop_id;
-        const triggeredId = prop_id.split('.')[0];
-        
-        // Reset buttons when view, tab, selected category, or compare mode changes (since figure is recreated)
-        if (['current-view', 'view-tabs', 'selected-activity', 'compare-mode'].includes(triggeredId)) {
-            return ["▶ Play", "primary", "▶ Play", "primary"];
-        }
-        
-        const gdCa = document.querySelector('#chart-ca .js-plotly-plot');
-        const gdVn = document.querySelector('#chart-vn .js-plotly-plot');
-        const isParallel = (animMode === 'parallel');
-        
-        const animOptions = {
-            frame: { duration: 180, redraw: true },
-            fromcurrent: true,
-            transition: { duration: 50, easing: 'linear' }
-        };
-        const pauseOptions = { mode: 'immediate' };
-        
-        if (triggeredId === 'btn-play-ca') {
-            const isPlaying = (caText === '⏸ Pause');
-            if (isPlaying) {
-                if (gdCa && window.Plotly) window.Plotly.animate(gdCa, [null], pauseOptions);
-                if (isParallel && gdVn && window.Plotly) {
-                    window.Plotly.animate(gdVn, [null], pauseOptions);
-                    return ["▶ Play", "primary", "▶ Play", "primary"];
-                }
-                return ["▶ Play", "primary", vnText, vnText === '⏸ Pause' ? "secondary" : "primary"];
-            } else {
-                if (gdCa && window.Plotly) window.Plotly.animate(gdCa, null, animOptions);
-                if (isParallel && gdVn && window.Plotly) {
-                    window.Plotly.animate(gdVn, null, animOptions);
-                    return ["⏸ Pause", "secondary", "⏸ Pause", "secondary"];
-                }
-                return ["⏸ Pause", "secondary", vnText, vnText === '⏸ Pause' ? "secondary" : "primary"];
-            }
-        } else if (triggeredId === 'btn-play-vn') {
-            const isPlaying = (vnText === '⏸ Pause');
-            if (isPlaying) {
-                if (gdVn && window.Plotly) window.Plotly.animate(gdVn, [null], pauseOptions);
-                if (isParallel && gdCa && window.Plotly) {
-                    window.Plotly.animate(gdCa, [null], pauseOptions);
-                    return ["▶ Play", "primary", "▶ Play", "primary"];
-                }
-                return [caText, caText === '⏸ Pause' ? "secondary" : "primary", "▶ Play", "primary"];
-            } else {
-                if (gdVn && window.Plotly) window.Plotly.animate(gdVn, null, animOptions);
-                if (isParallel && gdCa && window.Plotly) {
-                    window.Plotly.animate(gdCa, null, animOptions);
-                    return ["⏸ Pause", "secondary", "⏸ Pause", "secondary"];
-                }
-                return [caText, caText === '⏸ Pause' ? "secondary" : "primary", "⏸ Pause", "secondary"];
-            }
-        }
-        return [caText, "primary", vnText, "primary"];
-    }
-    """,
+    dash.ClientsideFunction(namespace="bcr", function_name="playPause"),
     [
         Output("btn-play-ca", "children"),
         Output("btn-play-ca", "color"),
