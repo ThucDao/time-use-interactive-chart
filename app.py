@@ -907,7 +907,10 @@ app.layout = html.Div(id="app-root", className="tempogram-mode", children=[
                         "backgroundColor": COLORS.get(act, "#999"), "border": "1px solid #bdc3c7",
                         "marginRight": "10px", "flexShrink": "0"
                     }),
-                    html.Strong(act, style={"minWidth": "170px", "marginRight": "10px", "color": "#2c3e50"}),
+                    html.Strong(
+                        "Sell goods or\nprovide services" if act == "Sell goods or provide services" else act,
+                        style={"width": "170px", "minWidth": "170px", "flexShrink": "0", "whiteSpace": "pre-line", "marginRight": "10px", "color": "#2c3e50"}
+                    ),
                     html.Span(desc, className="text-secondary")
                 ], className="d-flex align-items-center py-2 border-bottom", style={"fontSize": "0.88rem"})
                 for act, desc in ACTIVITY_DEFINITIONS.items()
