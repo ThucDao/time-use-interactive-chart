@@ -711,13 +711,13 @@ navbar = dbc.Navbar(
                     style={"width": "160px", "display": "inline-block", "flexShrink": "0"}
                 ),
                 html.Small(
-                    "Click a category in the legend to unlock.",
+                    "← To unlock, select a category\nin the legend.",
                     id="compare-mode-note",
                     className="text-light ms-2",
                     style={
                         "fontSize": "0.72rem",
                         "lineHeight": "1.15",
-                        "maxWidth": "200px",
+                        "whiteSpace": "pre-line",
                         "opacity": "0.9",
                         "display": "inline-block"
                     }
@@ -1052,7 +1052,7 @@ def sync_view_state(surp_click, current_view):
             {"label": "Independent animation", "value": "independent"},
             {"label": "Synced animation", "value": "parallel"}
         ]
-        compare_note = "Click a category in the vertical axis to unlock"
+        compare_note = "← To unlock, select a category\non the vertical axis."
         legend_style = {"display": "none"}
         bcr_style = {"display": "flex", "alignItems": "center"}
     else:
@@ -1066,7 +1066,7 @@ def sync_view_state(surp_click, current_view):
             {"label": "Independent hover", "value": "independent"},
             {"label": "Synced hover", "value": "parallel"}
         ]
-        compare_note = "Click a category in the legend to unlock."
+        compare_note = "← To unlock, select a category\nin the legend."
         legend_style = {
             "display": "flex", "flexWrap": "wrap", "justifyContent": "center",
             "gap": "5px", "padding": "5px", "maxHeight": "80px", "overflowY": "auto"
