@@ -363,13 +363,31 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
     text_font_size = 8.0 if is_two_col else 9.5
 
     times = panels[0][1].index[::15]  # 96 frames sampled every 15 minutes across 24h
+    acts = list(CATEGORY_ORDER)
+
+    tick_labels = []
+    for a in acts:
+        lbl = "Sell goods/services" if (is_two_col and a == "Sell goods or provide services") else a
+        if is_isolated and a == selected_act:
+            lbl = f"▶ {lbl}"
+        tick_labels.append(lbl)
+
+    def get_vals_and_ranks(df_m, t):
+        vals = [
+            float(df_m.loc[t, a]) if (df_m is not None and not df_m.empty and a in df_m.columns) else 0.0
+            for a in acts
+        ]
+        # Rank 0 = smallest at bottom, Rank 16 = largest at top; stable tie-breaker preserves CATEGORY_ORDER
+        order = sorted(range(len(acts)), key=lambda i: (round(vals[i], 4), -i))
+        ranks = [0.0] * len(acts)
+        for rank_pos, cat_idx in enumerate(order):
+            ranks[cat_idx] = float(rank_pos) + cat_idx * 1e-5
+        return vals, ranks
 
     def build_panel_traces(t, df_m, df_o, col_idx):
         xaxis_ref = "x" if col_idx == 1 else f"x{col_idx}"
         yaxis_ref = "y" if col_idx == 1 else f"y{col_idx}"
-        row_m = df_m.loc[t].sort_values(ascending=True)
-        acts = list(row_m.index)
-        vals = [float(v) for v in row_m.values]
+        vals, ranks = get_vals_and_ranks(df_m, t)
 
         if not is_isolated:
             colors = [COLORS.get(a, '#3498db') for a in acts]
@@ -378,7 +396,10 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
             texts = [f" {v:.1f}%" for v in vals]
             return [go.Bar(
                 x=vals,
-                y=acts,
+                y=ranks,
+                base=0,
+                width=0.76,
+                customdata=acts,
                 xaxis=xaxis_ref,
                 yaxis=yaxis_ref,
                 orientation='h',
@@ -387,9 +408,9 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
                 textposition='outside',
                 cliponaxis=False,
                 textfont=dict(size=text_font_size, color='#2c3e50'),
-                hovertemplate=f'<b>%{{y}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
+                hovertemplate=f'<b>%{{customdata}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
                 showlegend=False
-            )]
+            )], ranks
         elif not is_overlay:
             # Side-by-side with selected category highlighted and other categories dimmed
             colors = [
@@ -401,7 +422,10 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
             texts = [f" <b>{v:.1f}%</b>" if a == selected_act else f" {v:.1f}%" for a, v in zip(acts, vals)]
             return [go.Bar(
                 x=vals,
-                y=acts,
+                y=ranks,
+                base=0,
+                width=0.76,
+                customdata=acts,
                 xaxis=xaxis_ref,
                 yaxis=yaxis_ref,
                 orientation='h',
@@ -410,9 +434,9 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
                 textposition='outside',
                 cliponaxis=False,
                 textfont=dict(size=text_font_size, color='#0f172a'),
-                hovertemplate=f'<b>%{{y}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
+                hovertemplate=f'<b>%{{customdata}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
                 showlegend=False
-            )]
+            )], ranks
         else:
             # Overlay comparison: highlight selected category, dim other 16 categories, and overlay other country's bar on selected_act
             other_val = float(df_o.loc[t, selected_act]) if (df_o is not None and not df_o.empty and selected_act in df_o.columns) else 0.0
@@ -442,7 +466,9 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
 
             trace_main = go.Bar(
                 x=vals,
-                y=acts,
+                y=ranks,
+                base=0,
+                customdata=acts,
                 xaxis=xaxis_ref,
                 yaxis=yaxis_ref,
                 name=f"{country_name} ({selected_act})",
@@ -453,12 +479,14 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
                 textposition='outside',
                 cliponaxis=False,
                 textfont=dict(size=text_font_size, color='#0f172a'),
-                hovertemplate=f'<b>%{{y}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
+                hovertemplate=f'<b>%{{customdata}}</b> ({country_name}): %{{x:.1f}}%<extra></extra>',
                 showlegend=False
             )
             trace_other = go.Bar(
                 x=overlay_x,
-                y=acts,
+                y=ranks,
+                base=0,
+                customdata=acts,
                 xaxis=xaxis_ref,
                 yaxis=yaxis_ref,
                 name=f"{other_country_name} ({selected_act})",
@@ -469,32 +497,41 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
                 textposition='outside',
                 cliponaxis=False,
                 textfont=dict(size=text_font_size, color='#0f172a'),
-                hovertemplate=f'<b>%{{y}}</b> ({other_country_name} overlay): %{{x:.1f}}%<extra></extra>',
+                hovertemplate=f'<b>%{{customdata}}</b> ({other_country_name} overlay): %{{x:.1f}}%<extra></extra>',
                 showlegend=False
             )
-            return [trace_main, trace_other]
+            return [trace_main, trace_other], ranks
 
     frames = []
     for t in times:
         frame_traces = []
+        frame_ranks = []
         for idx, (_, df_m, df_o) in enumerate(panels, start=1):
-            frame_traces.extend(build_panel_traces(t, df_m, df_o, idx))
+            p_traces, p_ranks = build_panel_traces(t, df_m, df_o, idx)
+            frame_traces.extend(p_traces)
+            frame_ranks.append(p_ranks)
+        if is_two_col:
+            frame_layout = go.Layout(
+                yaxis=dict(tickmode="array", tickvals=frame_ranks[0], ticktext=tick_labels),
+                yaxis2=dict(tickmode="array", tickvals=frame_ranks[1], ticktext=tick_labels)
+            )
+        else:
+            frame_layout = go.Layout(
+                yaxis=dict(tickmode="array", tickvals=frame_ranks[0], ticktext=tick_labels)
+            )
         frames.append(go.Frame(
             data=frame_traces,
+            layout=frame_layout,
             traces=list(range(len(frame_traces))),
             name=t.strftime("%H:%M")
         ))
 
     initial_traces = []
+    initial_ranks = []
     for idx, (_, df_m, df_o) in enumerate(panels, start=1):
-        initial_traces.extend(build_panel_traces(times[0], df_m, df_o, idx))
-
-    label_alias = {}
-    if is_two_col:
-        label_alias["Sell goods or provide services"] = "Sell goods/services"
-    if is_isolated:
-        disp = label_alias.get(selected_act, selected_act)
-        label_alias[selected_act] = f"▶ {disp}"
+        p_traces, p_ranks = build_panel_traces(times[0], df_m, df_o, idx)
+        initial_traces.extend(p_traces)
+        initial_ranks.append(p_ranks)
 
     title_str = f"All 17 Activities in {country_name} — {subtitle_suffix}"
     if is_isolated:
@@ -532,8 +569,16 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
             barmode='overlay',
             xaxis=dict(range=[0, 118], title="Share (%)", showgrid=True, dtick=25, tickfont=dict(size=8.5)),
             xaxis2=dict(range=[0, 118], title="Share (%)", showgrid=True, dtick=25, tickfont=dict(size=8.5)),
-            yaxis=dict(showgrid=False, tickfont=dict(size=8.0), automargin=True, labelalias=label_alias),
-            yaxis2=dict(showgrid=False, tickfont=dict(size=8.0), automargin=True, labelalias=label_alias),
+            yaxis=dict(
+                type="linear", range=[-0.65, 16.65],
+                tickmode="array", tickvals=initial_ranks[0], ticktext=tick_labels,
+                showgrid=False, zeroline=False, tickfont=dict(size=8.0), automargin=True
+            ),
+            yaxis2=dict(
+                type="linear", range=[-0.65, 16.65],
+                tickmode="array", tickvals=initial_ranks[1], ticktext=tick_labels,
+                showgrid=False, zeroline=False, tickfont=dict(size=8.0), automargin=True
+            ),
             margin=dict(l=10, r=25, t=42, b=45),
             plot_bgcolor="white",
             paper_bgcolor="white",
@@ -547,7 +592,11 @@ def create_surprise_chart(tab_mode, is_ca, selected_act="Show All", compare_mode
                 title=dict(text=title_str, font=dict(size=12.5, color="#2c3e50")),
                 barmode='overlay',
                 xaxis=dict(range=[0, 115], title="Share of Population (%)", showgrid=True, dtick=20),
-                yaxis=dict(showgrid=False, tickfont=dict(size=9.5), automargin=True, labelalias=label_alias),
+                yaxis=dict(
+                    type="linear", range=[-0.65, 16.65],
+                    tickmode="array", tickvals=initial_ranks[0], ticktext=tick_labels,
+                    showgrid=False, zeroline=False, tickfont=dict(size=9.5), automargin=True
+                ),
                 margin=dict(l=10, r=25, t=35, b=45),
                 plot_bgcolor="white",
                 paper_bgcolor="white",
@@ -1284,7 +1333,8 @@ def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks, bcr_yaxis_data, ca_
     if btn_id in ["chart-ca", "chart-vn"] and chart_mode == "surprise":
         click_payload = ca_click_data if btn_id == "chart-ca" else vn_click_data
         if click_payload and click_payload.get("points"):
-            clicked_act = click_payload["points"][0].get("y")
+            pt = click_payload["points"][0]
+            clicked_act = pt.get("customdata") if pt.get("customdata") in COLORS else pt.get("y")
             if clicked_act in COLORS:
                 return "Show All" if clicked_act == current_selected else clicked_act
     return dash.no_update
