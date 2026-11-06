@@ -124,3 +124,58 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
         }
     }
 });
+
+// Synchronize each column filter box outer width to match its exact DataTable column width
+(function () {
+    function syncCountryFilterWidths(country) {
+        const container = document.getElementById('table-container-' + country);
+        if (!container || container.style.display === 'none') return;
+        const filterBar = document.getElementById('table-filters-' + country);
+        if (!filterBar) return;
+        const ths = container.querySelectorAll('th.dash-header');
+        if (!ths || !ths.length) return;
+        const visibleItems = Array.from(filterBar.querySelectorAll('.table-filter-item')).filter(
+            el => el.style.display !== 'none' && window.getComputedStyle(el).display !== 'none'
+        );
+        if (visibleItems.length !== ths.length) return;
+        for (let i = 0; i < ths.length; i++) {
+            const w = ths[i].getBoundingClientRect().width;
+            if (w > 0) {
+                const px = w.toFixed(2) + 'px';
+                if (visibleItems[i].style.width !== px) {
+                    visibleItems[i].style.width = px;
+                    visibleItems[i].style.flex = '0 0 ' + px;
+                    visibleItems[i].style.maxWidth = px;
+                }
+            }
+        }
+    }
+
+    function syncAllFilterWidths() {
+        syncCountryFilterWidths('ca');
+        syncCountryFilterWidths('vn');
+    }
+
+    window.addEventListener('resize', function () {
+        window.requestAnimationFrame(syncAllFilterWidths);
+    });
+
+    const obs = new MutationObserver(function () {
+        window.requestAnimationFrame(syncAllFilterWidths);
+    });
+
+    function initObserver() {
+        if (document.body) {
+            obs.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+            syncAllFilterWidths();
+        } else {
+            window.addEventListener('DOMContentLoaded', initObserver);
+        }
+    }
+    initObserver();
+})();

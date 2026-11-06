@@ -826,6 +826,225 @@ def render_legend(country_id):
         ))
     return html.Div(buttons, className="legend-container")
 
+ALL_TIME_OPTIONS = [
+    {"label": f"{h:02d}:{m:02d}", "value": f"{h:02d}:{m:02d}"}
+    for h in range(24) for m in range(60)
+]
+
+def render_table_section(country_id):
+    return [
+        # Column Filters Bar
+        html.Div(
+            id=f"table-filters-{country_id}",
+            className="table-filter-bar",
+            children=[
+                # 1. Time of day range filter
+                html.Div(
+                    id=f"filter-time-wrap-{country_id}",
+                    className="table-filter-item",
+                    style={"display": "flex", "flexDirection": "column", "width": "28%", "flex": "0 0 28%"},
+                    children=[
+                        html.Div("Time of day", className="table-filter-label"),
+                        html.Div(
+                            className="table-filter-control-row",
+                            children=[
+                                dcc.Dropdown(
+                                    id=f"filter-time-start-{country_id}",
+                                    options=ALL_TIME_OPTIONS,
+                                    value="00:00",
+                                    clearable=False,
+                                    searchable=True,
+                                    className="table-filter-dropdown time-filter-dropdown flex-grow-1"
+                                ),
+                                html.Span("–", className="table-filter-sep"),
+                                dcc.Dropdown(
+                                    id=f"filter-time-end-{country_id}",
+                                    options=ALL_TIME_OPTIONS,
+                                    value="23:59",
+                                    clearable=False,
+                                    searchable=True,
+                                    className="table-filter-dropdown time-filter-dropdown flex-grow-1"
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                # 2a. Gender multi-select filter (shown on By Gender, left of Activity group)
+                html.Div(
+                    id=f"filter-gender-wrap-{country_id}",
+                    className="table-filter-item",
+                    style={"display": "none"},
+                    children=[
+                        html.Div("Gender", className="table-filter-label"),
+                        html.Div(
+                            className="table-filter-control-row",
+                            children=[
+                                dcc.Dropdown(
+                                    id=f"filter-gender-{country_id}",
+                                    options=[{"label": g, "value": g} for g in ["Male", "Female"]],
+                                    value=[],
+                                    multi=True,
+                                    placeholder="All genders...",
+                                    className="table-filter-dropdown w-100"
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                # 2b. Age group multi-select filter (shown on By Age, left of Activity group)
+                html.Div(
+                    id=f"filter-age-wrap-{country_id}",
+                    className="table-filter-item",
+                    style={"display": "none"},
+                    children=[
+                        html.Div("Age group", className="table-filter-label"),
+                        html.Div(
+                            className="table-filter-control-row",
+                            children=[
+                                dcc.Dropdown(
+                                    id=f"filter-age-{country_id}",
+                                    options=[
+                                        {"label": a, "value": a}
+                                        for a in ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
+                                    ],
+                                    value=[],
+                                    multi=True,
+                                    placeholder="All age groups...",
+                                    className="table-filter-dropdown w-100"
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                # 3. Activity group multi-select filter
+                html.Div(
+                    id=f"filter-act-wrap-{country_id}",
+                    className="table-filter-item",
+                    style={"display": "flex", "flexDirection": "column", "width": "46%", "flex": "0 0 46%"},
+                    children=[
+                        html.Div("Activity group", className="table-filter-label"),
+                        html.Div(
+                            className="table-filter-control-row",
+                            children=[
+                                dcc.Dropdown(
+                                    id=f"filter-act-{country_id}",
+                                    options=[{"label": a, "value": a} for a in CATEGORY_ORDER],
+                                    value=[],
+                                    multi=True,
+                                    placeholder="All activities...",
+                                    className="table-filter-dropdown w-100"
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                # 4. Percentage range filter
+                html.Div(
+                    id=f"filter-pct-wrap-{country_id}",
+                    className="table-filter-item",
+                    style={"display": "flex", "flexDirection": "column", "width": "26%", "flex": "0 0 26%"},
+                    children=[
+                        html.Div("Percentage (%)", className="table-filter-label"),
+                        html.Div(
+                            className="table-filter-control-row",
+                            children=[
+                                dbc.Input(
+                                    id=f"filter-pct-min-{country_id}",
+                                    type="number",
+                                    min=0,
+                                    max=100,
+                                    step=0.1,
+                                    placeholder="Min",
+                                    size="sm",
+                                    className="table-filter-input flex-grow-1"
+                                ),
+                                html.Span("–", className="table-filter-sep"),
+                                dbc.Input(
+                                    id=f"filter-pct-max-{country_id}",
+                                    type="number",
+                                    min=0,
+                                    max=100,
+                                    step=0.1,
+                                    placeholder="Max",
+                                    size="sm",
+                                    className="table-filter-input flex-grow-1"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        ),
+        dash_table.DataTable(
+            id=f"datatable-{country_id}",
+            data=[],
+            columns=[],
+            page_action="custom",
+            page_current=0,
+            page_size=17,
+            page_count=1,
+            sort_action="custom",
+            sort_mode="single",
+            sort_by=[],
+            cell_selectable=False,
+            style_as_list_view=True,
+            style_table={
+                "flex": "1",
+                "minHeight": "0",
+                "overflowY": "auto",
+                "overflowX": "hidden",
+                "backgroundColor": "#ffffff"
+            },
+            style_header={
+                "backgroundColor": "#ffffff",
+                "fontWeight": "700",
+                "color": "#212529",
+                "borderTop": "none",
+                "borderLeft": "none",
+                "borderRight": "none",
+                "borderBottom": "2px solid #dee2e6",
+                "textAlign": "left",
+                "padding": "9px 12px",
+                "fontFamily": "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                "fontSize": "0.86rem"
+            },
+            style_cell={
+                "textAlign": "left",
+                "padding": "7px 12px",
+                "fontFamily": "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                "fontSize": "0.86rem",
+                "color": "#333333",
+                "borderLeft": "none",
+                "borderRight": "none",
+                "borderTop": "none",
+                "borderBottom": "1px solid #e9ecef",
+                "backgroundColor": "#ffffff",
+                "whiteSpace": "normal",
+                "height": "auto"
+            },
+            style_cell_conditional=[
+                {"if": {"column_id": "Time of day"}, "width": "28%", "minWidth": "28%", "maxWidth": "28%"},
+                {"if": {"column_id": "Activity group"}, "width": "46%", "minWidth": "46%", "maxWidth": "46%"},
+                {"if": {"column_id": "Percentage"}, "width": "26%", "minWidth": "26%", "maxWidth": "26%", "textAlign": "right"}
+            ],
+            style_data_conditional=[
+                {
+                    "if": {"row_index": "even"},
+                    "backgroundColor": "#f9f9f9"
+                },
+                {
+                    "if": {"row_index": "odd"},
+                    "backgroundColor": "#ffffff"
+                },
+                {
+                    "if": {"column_id": "Percentage"},
+                    "textAlign": "right"
+                }
+            ]
+        )
+    ]
+
+
 app.layout = html.Div(id="app-root", className="tempogram-mode", children=[
     dcc.Store(id='current-view', data='tempogram'),
     dcc.Store(id='selected-activity', data='Show All'),
@@ -853,7 +1072,7 @@ app.layout = html.Div(id="app-root", className="tempogram-mode", children=[
                         html.Div(id="mobile-nav-ca", style={"display": "none"}),
                         dcc.Graph(id="chart-ca", clear_on_unhover=True, config={'displayModeBar': False}, style={"height": "100%", "width": "100%"})
                     ]),
-                    html.Div(id="table-container-ca", className="graph-container", style={"display": "none"}),
+                    html.Div(id="table-container-ca", className="graph-container", style={"display": "none"}, children=render_table_section("ca")),
                     # 6. BCR controls row (Play button at most left of chart)
                     html.Div(id="bcr-controls-ca", className="bcr-controls align-items-center py-1 px-1", style={"display": "none"}, children=[
                         dbc.Button("▶ Play", id="btn-play-ca", size="sm", color="primary", className="rounded-pill shadow-sm px-3", style={"width": "90px", "flexShrink": "0"}),
@@ -882,7 +1101,7 @@ app.layout = html.Div(id="app-root", className="tempogram-mode", children=[
                         html.Div(id="mobile-nav-vn", style={"display": "none"}),
                         dcc.Graph(id="chart-vn", clear_on_unhover=True, config={'displayModeBar': False}, style={"height": "100%", "width": "100%"})
                     ]),
-                    html.Div(id="table-container-vn", className="graph-container", style={"display": "none"}),
+                    html.Div(id="table-container-vn", className="graph-container", style={"display": "none"}, children=render_table_section("vn")),
                     # 6. BCR controls row (Play button at most left of chart)
                     html.Div(id="bcr-controls-vn", className="bcr-controls align-items-center py-1 px-1", style={"display": "none"}, children=[
                         dbc.Button("▶ Play", id="btn-play-vn", size="sm", color="primary", className="rounded-pill shadow-sm px-3", style={"width": "90px", "flexShrink": "0"}),
@@ -1086,11 +1305,15 @@ def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks, bcr_yaxis_data, ca_
         Output("bcr-controls-ca", "style"),
         Output("bcr-controls-vn", "style"),
     ],
-    [Input("btn-surprise", "n_clicks")],
+    [
+        Input("btn-surprise", "n_clicks"),
+        Input("btn-toggle-ca", "n_clicks"),
+        Input("btn-toggle-vn", "n_clicks")
+    ],
     [State("current-view", "data")],
     prevent_initial_call=False
 )
-def sync_view_state(surp_click, current_view):
+def sync_view_state(surp_click, btn_ca, btn_vn, current_view):
     trig = ctx.triggered_id
     
     # Toggle between Bar Chart Race and Tempogram
@@ -1100,6 +1323,8 @@ def sync_view_state(surp_click, current_view):
         is_surprise = (current_view == "surprise")
         
     tabs_style = {"display": "block"}
+    show_data_ca = bool(btn_ca and btn_ca % 2 == 1)
+    show_data_vn = bool(btn_vn and btn_vn % 2 == 1)
 
     if is_surprise:
         # Bar Chart Race Active
@@ -1113,8 +1338,10 @@ def sync_view_state(surp_click, current_view):
             {"label": "Synced animation", "value": "parallel"}
         ]
         compare_note = "← To unlock, select a category\non the vertical axis."
-        legend_style = {"display": "none"}
-        bcr_style = {"display": "flex", "alignItems": "center"}
+        legend_style_ca = {"display": "none"}
+        legend_style_vn = {"display": "none"}
+        bcr_style_ca = {"display": "none"} if show_data_ca else {"display": "flex", "alignItems": "center"}
+        bcr_style_vn = {"display": "none"} if show_data_vn else {"display": "flex", "alignItems": "center"}
     else:
         # Tempogram Active
         new_view = "tempogram"
@@ -1127,16 +1354,19 @@ def sync_view_state(surp_click, current_view):
             {"label": "Synced hover", "value": "parallel"}
         ]
         compare_note = "← To unlock, select a category\nin the legend."
-        legend_style = {
+        base_legend_style = {
             "display": "flex", "flexWrap": "wrap", "justifyContent": "center",
             "gap": "5px", "padding": "5px", "maxHeight": "80px", "overflowY": "auto"
         }
-        bcr_style = {"display": "none"}
+        legend_style_ca = {"display": "none"} if show_data_ca else base_legend_style
+        legend_style_vn = {"display": "none"} if show_data_vn else base_legend_style
+        bcr_style_ca = {"display": "none"}
+        bcr_style_vn = {"display": "none"}
         
     return (
         new_view, root_class, title, tabs_style, btn_text, btn_color,
-        hover_options, compare_note, legend_style, legend_style,
-        bcr_style, bcr_style
+        hover_options, compare_note, legend_style_ca, legend_style_vn,
+        bcr_style_ca, bcr_style_vn
     )
 
 # Chart Updater
@@ -1212,30 +1442,372 @@ def update_figures(chart_mode, active_tab, selected_act, compare_mode, is_mobile
         
     return get_fig(True), get_fig(False)
 
+# Long-format table cache for fast View Data rendering
+_long_table_cache = {}
+
+def _get_long_table_df(is_ca, chart_mode, tab_mode):
+    tab_key = tab_mode or "overview"
+    mode_key = "surprise" if (chart_mode == "surprise" and tab_key == "age") else "tempogram"
+    cache_key = (bool(is_ca), mode_key, tab_key)
+    if cache_key in _long_table_cache:
+        return _long_table_cache[cache_key]
+
+    idx_country = 0 if is_ca else 1
+    df_ov = data_cache["overview"][idx_country]
+    times = df_ov.index.strftime("%H:%M").to_numpy()
+    acts = [a for a in CATEGORY_ORDER if a in df_ov.columns]
+    n_acts = len(acts)
+    n_times = len(times)
+
+    if tab_key == "overview":
+        col_time = np.repeat(times, n_acts)
+        col_act = np.tile(acts, n_times)
+        col_pct = df_ov[acts].to_numpy().ravel()
+        long_df = pd.DataFrame({
+            "Time of day": col_time,
+            "Activity group": col_act,
+            "_pct": col_pct,
+            "_pct_round": np.round(col_pct, 1)
+        })
+        # Sort by Time of day first (asc), then by Percentage (desc)
+        long_df = long_df.sort_values(
+            by=["Time of day", "_pct"],
+            ascending=[True, False],
+            kind="mergesort"
+        ).reset_index(drop=True)
+        cols = [
+            {"name": "Time of day", "id": "Time of day"},
+            {"name": "Activity group", "id": "Activity group"},
+            {"name": "Percentage", "id": "Percentage"}
+        ]
+    elif tab_key == "gender":
+        df_dict = data_cache["gender"][idx_country]
+        groups = ["Male", "Female"]
+        n_groups = len(groups)
+        col_time = np.repeat(times, n_groups * n_acts)
+        col_group = np.tile(np.repeat(groups, n_acts), n_times)
+        col_group_ord = np.tile(np.repeat(np.arange(n_groups), n_acts), n_times)
+        col_act = np.tile(acts, n_times * n_groups)
+        pct_vals = np.stack([df_dict[(g,)][acts].to_numpy() for g in groups], axis=1).ravel()
+        long_df = pd.DataFrame({
+            "Time of day": col_time,
+            "Gender": col_group,
+            "Activity group": col_act,
+            "_group_ord": col_group_ord,
+            "_pct": pct_vals,
+            "_pct_round": np.round(pct_vals, 1)
+        })
+        # Sort by Time of day first (asc), then by Gender (Male, Female), then by Percentage (desc)
+        long_df = long_df.sort_values(
+            by=["Time of day", "_group_ord", "_pct"],
+            ascending=[True, True, False],
+            kind="mergesort"
+        ).reset_index(drop=True)
+        cols = [
+            {"name": "Time of day", "id": "Time of day"},
+            {"name": "Gender", "id": "Gender"},
+            {"name": "Activity group", "id": "Activity group"},
+            {"name": "Percentage", "id": "Percentage"}
+        ]
+    else:  # age
+        if mode_key == "surprise":
+            df_dict = data_cache["age_bcr"][idx_country]
+            candidate_groups = ["15 to 24 years", "25 to 64 years"]
+        else:
+            df_dict = data_cache["age"][idx_country]
+            candidate_groups = ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
+        groups = [
+            g for g in candidate_groups
+            if (g,) in df_dict and not df_dict[(g,)].empty and df_dict[(g,)].sum().sum() > 0
+        ]
+        n_groups = len(groups)
+        col_time = np.repeat(times, n_groups * n_acts)
+        col_group = np.tile(np.repeat(groups, n_acts), n_times)
+        col_group_ord = np.tile(np.repeat(np.arange(n_groups), n_acts), n_times)
+        col_act = np.tile(acts, n_times * n_groups)
+        pct_vals = np.stack([df_dict[(g,)][acts].to_numpy() for g in groups], axis=1).ravel()
+        long_df = pd.DataFrame({
+            "Time of day": col_time,
+            "Age group": col_group,
+            "Activity group": col_act,
+            "_group_ord": col_group_ord,
+            "_pct": pct_vals,
+            "_pct_round": np.round(pct_vals, 1)
+        })
+        # Sort by Time of day first (asc), then by Age group, then by Percentage (desc)
+        long_df = long_df.sort_values(
+            by=["Time of day", "_group_ord", "_pct"],
+            ascending=[True, True, False],
+            kind="mergesort"
+        ).reset_index(drop=True)
+        cols = [
+            {"name": "Time of day", "id": "Time of day"},
+            {"name": "Age group", "id": "Age group"},
+            {"name": "Activity group", "id": "Activity group"},
+            {"name": "Percentage", "id": "Percentage"}
+        ]
+
+    _long_table_cache[cache_key] = (long_df, cols)
+    return long_df, cols
+
+
+def _format_pct(v):
+    val = round(float(v), 1)
+    if val == 0:
+        val = 0.0
+    return f"{val:.1f}%"
+
+
+def _build_table_slice(
+    is_ca, chart_mode, tab_mode, page_current, page_size, sort_by,
+    time_start="00:00", time_end="23:59", filter_gender=None, filter_age=None,
+    filter_act=None, pct_min=None, pct_max=None, reset_page=False
+):
+    base_df, cols = _get_long_table_df(is_ca, chart_mode, tab_mode)
+    work_df = base_df
+
+    # 1. Time of day range filter
+    t_start = time_start or "00:00"
+    t_end = time_end or "23:59"
+    if t_start > t_end:
+        t_start, t_end = t_end, t_start
+    if t_start != "00:00" or t_end != "23:59":
+        work_df = work_df[(work_df["Time of day"] >= t_start) & (work_df["Time of day"] <= t_end)]
+
+    # 2. Gender multi-select filter
+    if (tab_mode or "overview") == "gender" and filter_gender:
+        work_df = work_df[work_df["Gender"].isin(filter_gender)]
+
+    # 3. Age group multi-select filter
+    if (tab_mode or "overview") == "age" and filter_age:
+        work_df = work_df[work_df["Age group"].isin(filter_age)]
+
+    # 4. Activity group multi-select filter
+    if filter_act:
+        work_df = work_df[work_df["Activity group"].isin(filter_act)]
+
+    # 5. Percentage range filter
+    if pct_min is not None and pct_min != "":
+        try:
+            work_df = work_df[work_df["_pct_round"] >= float(pct_min)]
+        except (ValueError, TypeError):
+            pass
+    if pct_max is not None and pct_max != "":
+        try:
+            work_df = work_df[work_df["_pct_round"] <= float(pct_max)]
+        except (ValueError, TypeError):
+            pass
+
+    if sort_by and len(sort_by) > 0:
+        col_id = sort_by[0].get("column_id")
+        asc = (sort_by[0].get("direction") == "asc")
+        sort_col = "_pct" if col_id == "Percentage" else col_id
+        if sort_col in work_df.columns:
+            work_df = work_df.sort_values(by=sort_col, ascending=asc, kind="mergesort")
+
+    p_size = page_size or 17
+    page_count = max(1, (len(work_df) + p_size - 1) // p_size)
+    p_curr = 0 if reset_page else min(max(0, page_current or 0), page_count - 1)
+
+    start = p_curr * p_size
+    end = start + p_size
+    slice_df = work_df.iloc[start:end].copy()
+    slice_df["Percentage"] = [_format_pct(v) for v in slice_df["_pct"]]
+    col_ids = [c["id"] for c in cols]
+    records = slice_df[col_ids].to_dict("records")
+    return records, cols, page_count, p_curr
+
+
+# Data Table Filter Visibility, Column Width Alignment & Age Group Options Updater
+@app.callback(
+    [
+        Output("filter-time-wrap-ca", "style"),
+        Output("filter-gender-wrap-ca", "style"),
+        Output("filter-age-wrap-ca", "style"),
+        Output("filter-act-wrap-ca", "style"),
+        Output("filter-pct-wrap-ca", "style"),
+        Output("datatable-ca", "style_cell_conditional"),
+        Output("filter-age-ca", "options"),
+        Output("filter-age-ca", "value"),
+        Output("filter-time-wrap-vn", "style"),
+        Output("filter-gender-wrap-vn", "style"),
+        Output("filter-age-wrap-vn", "style"),
+        Output("filter-act-wrap-vn", "style"),
+        Output("filter-pct-wrap-vn", "style"),
+        Output("datatable-vn", "style_cell_conditional"),
+        Output("filter-age-vn", "options"),
+        Output("filter-age-vn", "value")
+    ],
+    [
+        Input("current-view", "data"),
+        Input("view-tabs", "active_tab")
+    ],
+    [
+        State("filter-age-ca", "value"),
+        State("filter-age-vn", "value")
+    ]
+)
+def sync_table_filter_visibility(chart_mode, active_tab, age_val_ca, age_val_vn):
+    tab_key = active_tab or "overview"
+
+    def col_box(pct):
+        return {"display": "flex", "flexDirection": "column", "width": pct, "flex": f"0 0 {pct}"}
+
+    if tab_key == "gender":
+        w_time, w_mid, w_act, w_pct = "27%", "21%", "30%", "22%"
+        time_style = col_box(w_time)
+        gender_style = col_box(w_mid)
+        age_style = {"display": "none"}
+        act_style = col_box(w_act)
+        pct_style = col_box(w_pct)
+        cell_cond = [
+            {"if": {"column_id": "Time of day"}, "width": w_time, "minWidth": w_time, "maxWidth": w_time},
+            {"if": {"column_id": "Gender"}, "width": w_mid, "minWidth": w_mid, "maxWidth": w_mid},
+            {"if": {"column_id": "Activity group"}, "width": w_act, "minWidth": w_act, "maxWidth": w_act},
+            {"if": {"column_id": "Percentage"}, "width": w_pct, "minWidth": w_pct, "maxWidth": w_pct, "textAlign": "right"}
+        ]
+    elif tab_key == "age":
+        w_time, w_mid, w_act, w_pct = "27%", "24%", "27%", "22%"
+        time_style = col_box(w_time)
+        gender_style = {"display": "none"}
+        age_style = col_box(w_mid)
+        act_style = col_box(w_act)
+        pct_style = col_box(w_pct)
+        cell_cond = [
+            {"if": {"column_id": "Time of day"}, "width": w_time, "minWidth": w_time, "maxWidth": w_time},
+            {"if": {"column_id": "Age group"}, "width": w_mid, "minWidth": w_mid, "maxWidth": w_mid},
+            {"if": {"column_id": "Activity group"}, "width": w_act, "minWidth": w_act, "maxWidth": w_act},
+            {"if": {"column_id": "Percentage"}, "width": w_pct, "minWidth": w_pct, "maxWidth": w_pct, "textAlign": "right"}
+        ]
+    else:
+        w_time, w_act, w_pct = "28%", "46%", "26%"
+        time_style = col_box(w_time)
+        gender_style = {"display": "none"}
+        age_style = {"display": "none"}
+        act_style = col_box(w_act)
+        pct_style = col_box(w_pct)
+        cell_cond = [
+            {"if": {"column_id": "Time of day"}, "width": w_time, "minWidth": w_time, "maxWidth": w_time},
+            {"if": {"column_id": "Activity group"}, "width": w_act, "minWidth": w_act, "maxWidth": w_act},
+            {"if": {"column_id": "Percentage"}, "width": w_pct, "minWidth": w_pct, "maxWidth": w_pct, "textAlign": "right"}
+        ]
+
+    if chart_mode == "surprise":
+        ages_ca = ["15 to 24 years", "25 to 64 years"]
+        ages_vn = ["15 to 24 years", "25 to 64 years"]
+    else:
+        ages_ca = ["15 to 34 years", "35 to 54 years", "55 to 64 years", "65 years and over"]
+        ages_vn = ["15 to 34 years", "35 to 54 years", "55 to 64 years"]
+
+    opts_ca = [{"label": a, "value": a} for a in ages_ca]
+    opts_vn = [{"label": a, "value": a} for a in ages_vn]
+    valid_ca = [v for v in (age_val_ca or []) if v in ages_ca]
+    valid_vn = [v for v in (age_val_vn or []) if v in ages_vn]
+
+    return (
+        time_style, gender_style, age_style, act_style, pct_style, cell_cond, opts_ca, valid_ca,
+        time_style, gender_style, age_style, act_style, pct_style, cell_cond, opts_vn, valid_vn
+    )
+
+
 # Data Table View Toggle
 @app.callback(
-    [Output("chart-container-ca", "style"), Output("table-container-ca", "style"), Output("table-container-ca", "children"), Output("btn-toggle-ca", "children"),
-     Output("chart-container-vn", "style"), Output("table-container-vn", "style"), Output("table-container-vn", "children"), Output("btn-toggle-vn", "children")],
+    [Output("chart-container-ca", "style"), Output("table-container-ca", "style"), Output("btn-toggle-ca", "children"),
+     Output("chart-container-vn", "style"), Output("table-container-vn", "style"), Output("btn-toggle-vn", "children")],
     [Input("btn-toggle-ca", "n_clicks"), Input("btn-toggle-vn", "n_clicks")]
 )
 def toggle_data_view(btn_ca, btn_vn):
-    df_ca_ov, df_vn_ov = data_cache['overview']
-    
-    def get_toggle_state(btn, df):
-        show_data = btn and btn % 2 == 1
+    def get_toggle_state(btn):
+        show_data = bool(btn and btn % 2 == 1)
         if show_data:
-            table = dash_table.DataTable(
-                data=df.reset_index().assign(index=lambda x: x['index'].dt.strftime('%H:%M')).to_dict('records'),
-                columns=[{"name": i, "id": i} for i in df.reset_index().columns],
-                page_size=100, style_table={'height': '100%', 'overflowY': 'auto'}, fixed_rows={'headers': True}
+            return (
+                {"display": "none"},
+                {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "height": "100%",
+                    "backgroundColor": "white",
+                    "overflow": "hidden"
+                },
+                "View Chart"
             )
-            return {"display": "none"}, {"display": "block", "height": "100%"}, table, "View Chart"
         else:
-            return {"display": "block", "height": "100%"}, {"display": "none"}, None, "View Data"
+            return {"display": "block", "height": "100%"}, {"display": "none"}, "View Data"
 
-    ca_chart, ca_table, ca_children, ca_text = get_toggle_state(btn_ca, df_ca_ov)
-    vn_chart, vn_table, vn_children, vn_text = get_toggle_state(btn_vn, df_vn_ov)
-    return ca_chart, ca_table, ca_children, ca_text, vn_chart, vn_table, vn_children, vn_text
+    ca_chart, ca_table, ca_text = get_toggle_state(btn_ca)
+    vn_chart, vn_table, vn_text = get_toggle_state(btn_vn)
+    return ca_chart, ca_table, ca_text, vn_chart, vn_table, vn_text
+
+
+# Data Table Content & Server-Side Pagination/Sorting/Filtering
+@app.callback(
+    [
+        Output("datatable-ca", "data"),
+        Output("datatable-ca", "columns"),
+        Output("datatable-ca", "page_count"),
+        Output("datatable-ca", "page_current"),
+        Output("datatable-vn", "data"),
+        Output("datatable-vn", "columns"),
+        Output("datatable-vn", "page_count"),
+        Output("datatable-vn", "page_current")
+    ],
+    [
+        Input("current-view", "data"),
+        Input("view-tabs", "active_tab"),
+        Input("datatable-ca", "page_current"),
+        Input("datatable-ca", "page_size"),
+        Input("datatable-ca", "sort_by"),
+        Input("filter-time-start-ca", "value"),
+        Input("filter-time-end-ca", "value"),
+        Input("filter-gender-ca", "value"),
+        Input("filter-age-ca", "value"),
+        Input("filter-act-ca", "value"),
+        Input("filter-pct-min-ca", "value"),
+        Input("filter-pct-max-ca", "value"),
+        Input("datatable-vn", "page_current"),
+        Input("datatable-vn", "page_size"),
+        Input("datatable-vn", "sort_by"),
+        Input("filter-time-start-vn", "value"),
+        Input("filter-time-end-vn", "value"),
+        Input("filter-gender-vn", "value"),
+        Input("filter-age-vn", "value"),
+        Input("filter-act-vn", "value"),
+        Input("filter-pct-min-vn", "value"),
+        Input("filter-pct-max-vn", "value")
+    ]
+)
+def update_datatables(
+    chart_mode, active_tab,
+    page_ca, size_ca, sort_ca, t_start_ca, t_end_ca, f_gender_ca, f_age_ca, f_act_ca, p_min_ca, p_max_ca,
+    page_vn, size_vn, sort_vn, t_start_vn, t_end_vn, f_gender_vn, f_age_vn, f_act_vn, p_min_vn, p_max_vn
+):
+    trig = ctx.triggered_id
+    reset_ca = trig in [
+        "current-view", "view-tabs",
+        "filter-time-start-ca", "filter-time-end-ca",
+        "filter-gender-ca", "filter-age-ca", "filter-act-ca",
+        "filter-pct-min-ca", "filter-pct-max-ca"
+    ]
+    reset_vn = trig in [
+        "current-view", "view-tabs",
+        "filter-time-start-vn", "filter-time-end-vn",
+        "filter-gender-vn", "filter-age-vn", "filter-act-vn",
+        "filter-pct-min-vn", "filter-pct-max-vn"
+    ]
+
+    ca_data, ca_cols, ca_pcount, ca_pcurr = _build_table_slice(
+        True, chart_mode, active_tab, page_ca, size_ca, sort_ca,
+        time_start=t_start_ca, time_end=t_end_ca,
+        filter_gender=f_gender_ca, filter_age=f_age_ca, filter_act=f_act_ca,
+        pct_min=p_min_ca, pct_max=p_max_ca, reset_page=reset_ca
+    )
+    vn_data, vn_cols, vn_pcount, vn_pcurr = _build_table_slice(
+        False, chart_mode, active_tab, page_vn, size_vn, sort_vn,
+        time_start=t_start_vn, time_end=t_end_vn,
+        filter_gender=f_gender_vn, filter_age=f_age_vn, filter_act=f_act_vn,
+        pct_min=p_min_vn, pct_max=p_max_vn, reset_page=reset_vn
+    )
+    return ca_data, ca_cols, ca_pcount, ca_pcurr, vn_data, vn_cols, vn_pcount, vn_pcurr
 
 
 # 1 & 2: Sync Hover & Tooltip Synchronization
