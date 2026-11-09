@@ -637,35 +637,59 @@ app.index_string = r'''
             .bcr-controls { display: none; }
 
             /* Modern Segmented Pill Tabs in Navbar */
+            #tabs-container {
+                display: inline-flex !important;
+                align-items: center !important;
+                margin: 0 12px 0 0 !important;
+                padding: 0 !important;
+            }
+            #tabs-container > div {
+                display: inline-flex !important;
+                align-items: center !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
             #tabs-container .nav,
             #tabs-container .nav-tabs,
             #view-tabs {
                 background: rgba(8, 35, 20, 0.42) !important;
                 padding: 4px !important;
                 border-radius: 999px !important;
-                border: 1px solid rgba(255, 255, 255, 0.28) !important;
-                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+                border: 1px solid rgba(255, 255, 255, 0.25) !important;
+                box-shadow: none !important;
                 display: inline-flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
                 align-items: center !important;
+                justify-content: center !important;
                 gap: 4px !important;
-                margin-bottom: 0 !important;
+                margin: 0 !important;
             }
             #tabs-container .nav-item,
             #view-tabs .nav-item {
-                margin-bottom: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             #tabs-container .nav-link,
             #view-tabs .nav-link {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
                 border: none !important;
                 border-radius: 999px !important;
-                padding: 5px 15px !important;
+                height: 28px !important;
+                padding: 0 15px 1px 15px !important;
+                margin: 0 !important;
                 font-size: 0.82rem !important;
                 font-weight: 600 !important;
                 letter-spacing: 0.015em !important;
                 color: rgba(255, 255, 255, 0.85) !important;
                 background: transparent !important;
                 transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-                line-height: 1.25 !important;
+                line-height: 1 !important;
                 white-space: nowrap !important;
                 cursor: pointer !important;
             }
@@ -676,10 +700,10 @@ app.index_string = r'''
             }
             #tabs-container .nav-link.active,
             #view-tabs .nav-link.active {
-                background: linear-gradient(180deg, #ffffff 0%, #dcfce7 100%) !important;
+                background: #ffffff !important;
                 color: #14532d !important;
                 font-weight: 700 !important;
-                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
+                box-shadow: none !important;
             }
 
             /* Frozen / disabled state for compare-mode dropdown */
@@ -725,12 +749,253 @@ app.index_string = r'''
                 opacity: 0.94 !important;
             }
 
+            .mobile-only-about {
+                display: none !important;
+            }
+
+            /* Unified Chart-Icon Rocker + Single-Title Switcher (Desktop & Mobile) */
+            #chart-type-title {
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 8px !important;
+                padding: 4px 11px 4px 5px !important;
+                margin-right: 12px !important;
+                background-color: rgba(8, 35, 20, 0.36) !important;
+                border: 1px solid rgba(255, 255, 255, 0.25) !important;
+                border-radius: 9px !important;
+                cursor: pointer !important;
+                user-select: none !important;
+                flex-shrink: 0 !important;
+                transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease !important;
+            }
+            #chart-type-title:hover {
+                background-color: rgba(8, 35, 20, 0.52) !important;
+                border-color: rgba(251, 191, 36, 0.65) !important;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18) !important;
+            }
+            #chart-type-title .chart-title-switch {
+                order: 1 !important;
+                position: relative !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                width: 44px !important;
+                height: 22px !important;
+                padding: 0 4px !important;
+                border-radius: 6px !important;
+                background-color: rgba(0, 0, 0, 0.28) !important;
+                border: 1px solid rgba(255, 255, 255, 0.24) !important;
+                flex-shrink: 0 !important;
+                box-sizing: border-box !important;
+                transition: background-color 0.22s ease, border-color 0.22s ease !important;
+            }
+            /* Mini chart-type glyph icons inside the toggle track */
+            #chart-type-title .chart-title-switch::before,
+            #chart-type-title .chart-title-switch::after {
+                content: "" !important;
+                display: inline-block !important;
+                position: relative !important;
+                z-index: 2 !important;
+                width: 13px !important;
+                height: 13px !important;
+                background-repeat: no-repeat !important;
+                background-position: center !important;
+                background-size: 12px 12px !important;
+                transition: opacity 0.2s ease, filter 0.2s ease !important;
+            }
+            /* Left icon: stacked area / wave (Tempogram) */
+            #chart-type-title .chart-title-switch::before {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M1.5 12.5V8.5L5.5 5L9.5 7.5L14.5 3.5V12.5H1.5Z' fill='%2314532d' stroke='%2314532d' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M1.5 5.5L5.5 2.5L9.5 4.5L14.5 1.5' stroke='%2314532d' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+                opacity: 1 !important;
+            }
+            /* Right icon: horizontal ranked bars (Bar Chart Race) */
+            #chart-type-title .chart-title-switch::after {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2.5' width='12' height='2.6' rx='1' fill='%23ffffff'/%3E%3Crect x='2' y='6.7' width='8.5' height='2.6' rx='1' fill='%23ffffff'/%3E%3Crect x='2' y='10.9' width='5.5' height='2.6' rx='1' fill='%23ffffff'/%3E%3C/svg%3E") !important;
+                opacity: 0.65 !important;
+            }
+            .bcr-mode #chart-type-title .chart-title-switch::before {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M1.5 12.5V8.5L5.5 5L9.5 7.5L14.5 3.5V12.5H1.5Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M1.5 5.5L5.5 2.5L9.5 4.5L14.5 1.5' stroke='%23ffffff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+                opacity: 0.65 !important;
+            }
+            .bcr-mode #chart-type-title .chart-title-switch::after {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2.5' width='12' height='2.6' rx='1' fill='%2314532d'/%3E%3Crect x='2' y='6.7' width='8.5' height='2.6' rx='1' fill='%2314532d'/%3E%3Crect x='2' y='10.9' width='5.5' height='2.6' rx='1' fill='%2314532d'/%3E%3C/svg%3E") !important;
+                opacity: 1 !important;
+            }
+            #chart-type-title .chart-title-knob {
+                position: absolute !important;
+                z-index: 1 !important;
+                left: 2px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                width: 19px !important;
+                height: 16px !important;
+                border-radius: 4px !important;
+                background-color: #fbbf24 !important;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+                transition: left 0.22s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.22s ease !important;
+            }
+            .bcr-mode #chart-type-title .chart-title-knob {
+                left: 21px !important;
+                background-color: #fbbf24 !important;
+            }
+            #chart-type-title .chart-title-opt {
+                order: 2 !important;
+                line-height: 1 !important;
+                white-space: nowrap !important;
+            }
+            .tempogram-mode #chart-type-title .opt-tempogram,
+            .bcr-mode #chart-type-title .opt-bcr {
+                display: inline-block !important;
+                font-size: 1.05rem !important;
+                font-weight: 700 !important;
+                color: #ffffff !important;
+            }
+            .tempogram-mode #chart-type-title .opt-bcr,
+            .bcr-mode #chart-type-title .opt-tempogram {
+                display: none !important;
+            }
+
             @media (max-width: 767px) {
                 .main-row { flex-direction: column; height: auto !important; overflow-y: auto; }
                 .col-card { height: 500px !important; margin-bottom: 15px; }
                 .legend-container { display: none !important; }
                 .hovertext text { font-size: 9px !important; }
                 html, body { overflow: auto !important; height: auto !important; }
+
+                .top-navbar {
+                    height: auto !important;
+                    min-height: 0 !important;
+                    padding: 7px 6px !important;
+                }
+                .navbar-inner-container {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                    gap: 6px !important;
+                    padding: 0 4px !important;
+                }
+                .navbar-left-group {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                    width: 100% !important;
+                    gap: 6px !important;
+                }
+                .navbar-row-1 {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    justify-content: space-between !important;
+                    align-items: center !important;
+                    width: 100% !important;
+                    gap: 4px !important;
+                    flex-wrap: nowrap !important;
+                }
+                #chart-type-title {
+                    gap: 5px !important;
+                    height: 29px !important;
+                    padding: 3px 7px 3px 4px !important;
+                    margin-right: 0 !important;
+                    border-radius: 8px !important;
+                }
+                #chart-type-title .chart-title-switch {
+                    width: 36px !important;
+                    height: 19px !important;
+                    padding: 0 3px !important;
+                    border-radius: 5px !important;
+                }
+                #chart-type-title .chart-title-switch::before,
+                #chart-type-title .chart-title-switch::after {
+                    width: 11px !important;
+                    height: 11px !important;
+                    background-size: 10px 10px !important;
+                }
+                #chart-type-title .chart-title-knob {
+                    left: 2px !important;
+                    width: 15px !important;
+                    height: 13px !important;
+                    border-radius: 3.5px !important;
+                }
+                .bcr-mode #chart-type-title .chart-title-knob {
+                    left: 17px !important;
+                }
+                .tempogram-mode #chart-type-title .opt-tempogram,
+                .bcr-mode #chart-type-title .opt-bcr {
+                    font-size: 0.78rem !important;
+                }
+                #tabs-container {
+                    margin: 0 !important;
+                    flex-shrink: 0 !important;
+                }
+                #tabs-container .nav,
+                #tabs-container .nav-tabs,
+                #view-tabs {
+                    display: inline-flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                    padding: 3px !important;
+                    gap: 2px !important;
+                }
+                #tabs-container .nav-link,
+                #view-tabs .nav-link {
+                    height: 23px !important;
+                    padding: 0 7px 1px 7px !important;
+                    font-size: 0.72rem !important;
+                }
+                .mobile-only-about {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    height: 29px !important;
+                    padding: 0 10px !important;
+                    margin: 0 !important;
+                    border-radius: 999px !important;
+                    font-size: 0.73rem !important;
+                    font-weight: 600 !important;
+                    line-height: 1 !important;
+                    flex-shrink: 0 !important;
+                }
+                .navbar-row-2 {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    align-items: center !important;
+                    width: 100% !important;
+                    gap: 5px !important;
+                    flex-wrap: nowrap !important;
+                }
+                #hover-mode {
+                    width: auto !important;
+                    flex: 1.0 1 0 !important;
+                    min-width: 0 !important;
+                    margin-right: 0 !important;
+                    font-size: 0.72rem !important;
+                    padding: 3px 18px 3px 6px !important;
+                    background-position: right 0.35rem center !important;
+                }
+                .navbar-compare-wrap {
+                    display: flex !important;
+                    align-items: center !important;
+                    flex: 2.0 1 0 !important;
+                    min-width: 0 !important;
+                    gap: 5px !important;
+                }
+                #compare-mode {
+                    width: auto !important;
+                    flex: 1 1 0 !important;
+                    min-width: 0 !important;
+                    font-size: 0.72rem !important;
+                    padding: 3px 18px 3px 6px !important;
+                    background-position: right 0.35rem center !important;
+                }
+                #compare-mode-note {
+                    margin-left: 0 !important;
+                    font-size: 0.63rem !important;
+                    line-height: 1.1 !important;
+                    flex-shrink: 0 !important;
+                    white-space: pre-line !important;
+                }
+                .navbar-row-actions {
+                    display: none !important;
+                }
             }
         </style>
         <script>
@@ -768,76 +1033,95 @@ app.index_string = r'''
 navbar = dbc.Navbar(
     dbc.Container([
         html.Div([
-            # 11. Chart Type Title at the leftmost
-            html.Span("Tempogram", id="chart-type-title", className="fw-bold fs-5 text-white me-3 align-self-center", style={"whiteSpace": "nowrap"}),
+            # Mobile Row 1: Chart Type Title (dual-label rocker on desktop, single-label toggle on mobile) + Capsule Track + Mobile About button
+            html.Div([
+                html.Div(
+                    id="chart-type-title",
+                    title="Click to switch between Tempogram and Bar Chart Race",
+                    className="chart-type-switcher align-self-center",
+                    children=[
+                        html.Span("Tempogram", className="chart-title-opt opt-tempogram"),
+                        html.Span(
+                            className="chart-title-switch",
+                            children=[html.Span(className="chart-title-knob")]
+                        ),
+                        html.Span("Bar Chart Race", className="chart-title-opt opt-bcr"),
+                    ]
+                ),
+                html.Div(
+                    id="tabs-container",
+                    children=[
+                        dbc.Tabs(
+                            id="view-tabs",
+                            active_tab="overview",
+                            children=[
+                                dbc.Tab(label="Overview", tab_id="overview"),
+                                dbc.Tab(label="By Gender", tab_id="gender"),
+                                dbc.Tab(label="By Age", tab_id="age"),
+                            ],
+                            className="me-2"
+                        )
+                    ]
+                ),
+                dbc.Button(
+                    "About",
+                    id="btn-definitions-mobile",
+                    color="info",
+                    size="sm",
+                    className="shadow-sm mobile-only-about",
+                    style={"whiteSpace": "nowrap"}
+                )
+            ], className="d-flex align-items-center navbar-row-1"),
             
-            # 12. Tabs Container (Overview, By Gender, By Age)
-            html.Div(
-                id="tabs-container",
-                children=[
-                    dbc.Tabs(
-                        id="view-tabs",
-                        active_tab="overview",
-                        children=[
-                            dbc.Tab(label="Overview", tab_id="overview"),
-                            dbc.Tab(label="By Gender", tab_id="gender"),
-                            dbc.Tab(label="By Age", tab_id="age"),
-                        ],
-                        className="me-2"
-                    )
-                ]
-            ),
-            
-            # 5 & 13. Hover / Animation Mode Dropdown
-            dbc.Select(
-                id="hover-mode",
-                options=[
-                    {"label": "Independent hover", "value": "independent"},
-                    {"label": "Synced hover", "value": "parallel"}
-                ],
-                value="independent",
-                size="sm",
-                style={"width": "190px", "display": "inline-block", "marginRight": "8px", "flexShrink": "0"}
-            ),
-            
-            # 3 & 8. Comparison Mode Dropdown (frozen by default until a category is selected) + Note
+            # Mobile Row 2: Hover/Animation Mode Dropdown + Compare-Mode Dropdown + Note
             html.Div([
                 dbc.Select(
-                    id="compare-mode",
+                    id="hover-mode",
                     options=[
-                        {"label": "Side-by-side", "value": "separate"},
-                        {"label": "Overlay comparison", "value": "overlay"}
+                        {"label": "Independent hover", "value": "independent"},
+                        {"label": "Synced hover", "value": "parallel"}
                     ],
-                    value="separate",
-                    disabled=True,
+                    value="independent",
                     size="sm",
-                    style={"width": "170px", "display": "inline-block", "flexShrink": "0"}
+                    style={"width": "190px", "display": "inline-block", "marginRight": "8px", "flexShrink": "0"}
                 ),
-                html.Small(
-                    "← To unlock, select a category\nin the legend.",
-                    id="compare-mode-note",
-                    className="text-light ms-2",
-                    style={
-                        "fontSize": "0.72rem",
-                        "lineHeight": "1.15",
-                        "whiteSpace": "pre-line",
-                        "opacity": "0.9",
-                        "display": "inline-block"
-                    }
-                )
-            ], className="d-flex align-items-center")
-        ], className="d-flex align-items-center"),
+                html.Div([
+                    dbc.Select(
+                        id="compare-mode",
+                        options=[
+                            {"label": "Side-by-side", "value": "separate"},
+                            {"label": "Overlay comparison", "value": "overlay"}
+                        ],
+                        value="separate",
+                        disabled=True,
+                        size="sm",
+                        style={"width": "170px", "display": "inline-block", "flexShrink": "0"}
+                    ),
+                    html.Small(
+                        "← To unlock, select a category\nin the legend.",
+                        id="compare-mode-note",
+                        className="text-light ms-2",
+                        style={
+                            "fontSize": "0.72rem",
+                            "lineHeight": "1.15",
+                            "whiteSpace": "pre-line",
+                            "opacity": "0.9",
+                            "display": "inline-block"
+                        }
+                    )
+                ], className="d-flex align-items-center navbar-compare-wrap")
+            ], className="d-flex align-items-center navbar-row-2")
+        ], className="d-flex align-items-center navbar-left-group"),
         
         # Right-side action buttons
         html.Div([
-            # 9, 10, 12. Switch Button (Before Definitions button with equal distance)
             dbc.Button(
                 "SWITCH to Bar Chart Race",
                 id="btn-surprise",
                 color="warning",
                 size="sm",
                 className="rounded-pill shadow-sm",
-                style={"marginLeft": "12px", "marginRight": "12px", "whiteSpace": "nowrap"}
+                style={"display": "none"}
             ),
             dbc.Button(
                 "About",
@@ -847,8 +1131,9 @@ navbar = dbc.Navbar(
                 className="shadow-sm",
                 style={"whiteSpace": "nowrap"}
             )
-        ], className="d-flex align-items-center ms-auto")
-    ], fluid=True),
+        ], className="d-flex align-items-center ms-auto navbar-row-actions")
+    ], fluid=True, className="navbar-inner-container"),
+    className="top-navbar",
     dark=True,
     style={
         "height": "60px",
@@ -1205,11 +1490,15 @@ app.layout = html.Div(id="app-root", className="tempogram-mode", children=[
 
 @app.callback(
     Output("modal-definitions", "is_open"),
-    [Input("btn-definitions", "n_clicks"), Input("btn-close-definitions", "n_clicks")],
+    [
+        Input("btn-definitions", "n_clicks"),
+        Input("btn-definitions-mobile", "n_clicks"),
+        Input("btn-close-definitions", "n_clicks")
+    ],
     State("modal-definitions", "is_open"),
     prevent_initial_call=True
 )
-def toggle_modal(n_open, n_close, is_open):
+def toggle_modal(n_open, n_open_mob, n_close, is_open):
     return not is_open
 
 # Show All Visibility & Compare Mode Dropdown Freeze/Unfreeze
@@ -1344,7 +1633,6 @@ def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks, bcr_yaxis_data, ca_
     [
         Output("current-view", "data"),
         Output("app-root", "className"),
-        Output("chart-type-title", "children"),
         Output("tabs-container", "style"),
         Output("btn-surprise", "children"),
         Output("btn-surprise", "color"),
@@ -1357,22 +1645,23 @@ def handle_legend_click(n_clicks_list, ca_clicks, vn_clicks, bcr_yaxis_data, ca_
     ],
     [
         Input("btn-surprise", "n_clicks"),
+        Input("chart-type-title", "n_clicks"),
         Input("btn-toggle-ca", "n_clicks"),
         Input("btn-toggle-vn", "n_clicks")
     ],
     [State("current-view", "data")],
     prevent_initial_call=False
 )
-def sync_view_state(surp_click, btn_ca, btn_vn, current_view):
+def sync_view_state(surp_click, title_click, btn_ca, btn_vn, current_view):
     trig = ctx.triggered_id
     
     # Toggle between Bar Chart Race and Tempogram
-    if trig == "btn-surprise":
+    if trig in ["btn-surprise", "chart-type-title"]:
         is_surprise = (current_view != "surprise")
     else:
         is_surprise = (current_view == "surprise")
         
-    tabs_style = {"display": "block"}
+    tabs_style = {"display": "inline-flex", "alignItems": "center"}
     show_data_ca = bool(btn_ca and btn_ca % 2 == 1)
     show_data_vn = bool(btn_vn and btn_vn % 2 == 1)
 
@@ -1380,7 +1669,6 @@ def sync_view_state(surp_click, btn_ca, btn_vn, current_view):
         # Bar Chart Race Active
         new_view = "surprise"
         root_class = "bcr-mode"
-        title = "Bar Chart Race"
         btn_text = "SWITCH to Tempogram"
         btn_color = "warning"
         hover_options = [
@@ -1396,7 +1684,6 @@ def sync_view_state(surp_click, btn_ca, btn_vn, current_view):
         # Tempogram Active
         new_view = "tempogram"
         root_class = "tempogram-mode"
-        title = "Tempogram"
         btn_text = "SWITCH to Bar Chart Race"
         btn_color = "warning"
         hover_options = [
@@ -1414,7 +1701,7 @@ def sync_view_state(surp_click, btn_ca, btn_vn, current_view):
         bcr_style_vn = {"display": "none"}
         
     return (
-        new_view, root_class, title, tabs_style, btn_text, btn_color,
+        new_view, root_class, tabs_style, btn_text, btn_color,
         hover_options, compare_note, legend_style_ca, legend_style_vn,
         bcr_style_ca, bcr_style_vn
     )
