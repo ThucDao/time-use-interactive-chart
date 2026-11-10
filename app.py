@@ -857,8 +857,42 @@ app.index_string = r'''
 
             @media (max-width: 767px) {
                 .main-row { flex-direction: column; height: auto !important; overflow-y: auto; }
-                .col-card { height: 500px !important; margin-bottom: 15px; }
-                .legend-container { display: none !important; }
+                .col-card { height: 520px !important; margin-bottom: 15px; }
+                #chart-container-ca,
+                #chart-container-vn {
+                    flex: 1 1 0 !important;
+                    min-height: 0 !important;
+                    overflow: hidden !important;
+                }
+                .legend-container {
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    justify-content: center !important;
+                    gap: 3px !important;
+                    padding: 3px 2px !important;
+                    max-height: none !important;
+                    overflow-y: visible !important;
+                }
+                .legend-btn {
+                    font-size: 0.62rem !important;
+                    padding: 1px 5px !important;
+                    border-radius: 9px !important;
+                    line-height: 1.2 !important;
+                }
+                #legend-container-ca,
+                #legend-container-vn {
+                    flex-shrink: 0 !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                }
+                .bcr-controls {
+                    flex-shrink: 0 !important;
+                    min-height: 36px !important;
+                    padding: 4px 4px 2px 4px !important;
+                    position: relative !important;
+                    z-index: 5 !important;
+                    background-color: #ffffff !important;
+                }
                 .hovertext text { font-size: 9px !important; }
                 html, body { overflow: auto !important; height: auto !important; }
 
@@ -1098,7 +1132,10 @@ navbar = dbc.Navbar(
                         style={"width": "170px", "display": "inline-block", "flexShrink": "0"}
                     ),
                     html.Small(
-                        "← To unlock, select a category\nin the legend.",
+                        [
+                            html.Span("«", style={"fontSize": "2em", "lineHeight": "0.5", "verticalAlign": "-0.12em", "marginRight": "3px"}),
+                            "select a category\nin the legend first"
+                        ],
                         id="compare-mode-note",
                         className="text-light ms-2",
                         style={
@@ -1507,18 +1544,27 @@ def toggle_modal(n_open, n_open_mob, n_close, is_open):
         Output("btn-show-all-ca", "style"),
         Output("btn-show-all-vn", "style"),
         Output("compare-mode", "disabled"),
-        Output("compare-mode", "value")
+        Output("compare-mode", "value"),
+        Output("compare-mode-note", "style")
     ],
     Input("selected-activity", "data"),
     State("compare-mode", "value")
 )
 def toggle_show_all_and_compare_mode(selected_act, current_compare):
+    note_base_style = {
+        "fontSize": "0.72rem",
+        "lineHeight": "1.15",
+        "whiteSpace": "pre-line",
+        "opacity": "0.9"
+    }
     if not selected_act or selected_act == "Show All":
         style = {"display": "none"}
-        return style, style, True, "separate"
+        note_style = {**note_base_style, "display": "inline-block"}
+        return style, style, True, "separate", note_style
     else:
         style = {"display": "inline-block", "whiteSpace": "nowrap", "padding": "2px 8px", "fontSize": "0.75rem"}
-        return style, style, False, (current_compare or "separate")
+        note_style = {**note_base_style, "display": "none"}
+        return style, style, False, (current_compare or "separate"), note_style
 
 # Mobile Width Detection
 app.clientside_callback(
@@ -1675,7 +1721,10 @@ def sync_view_state(surp_click, title_click, btn_ca, btn_vn, current_view):
             {"label": "Independent animation", "value": "independent"},
             {"label": "Synced animation", "value": "parallel"}
         ]
-        compare_note = "← To unlock, select a category\non the vertical axis."
+        compare_note = [
+            html.Span("«", style={"fontSize": "2em", "lineHeight": "0.5", "verticalAlign": "-0.12em", "marginRight": "3px"}),
+            "select a category\non the axis first"
+        ]
         legend_style_ca = {"display": "none"}
         legend_style_vn = {"display": "none"}
         bcr_style_ca = {"display": "none"} if show_data_ca else {"display": "flex", "alignItems": "center"}
@@ -1690,7 +1739,10 @@ def sync_view_state(surp_click, title_click, btn_ca, btn_vn, current_view):
             {"label": "Independent hover", "value": "independent"},
             {"label": "Synced hover", "value": "parallel"}
         ]
-        compare_note = "← To unlock, select a category\nin the legend."
+        compare_note = [
+            html.Span("«", style={"fontSize": "2em", "lineHeight": "0.5", "verticalAlign": "-0.12em", "marginRight": "3px"}),
+            "select a category\nin the legend first"
+        ]
         base_legend_style = {
             "display": "flex", "flexWrap": "wrap", "justifyContent": "center",
             "gap": "5px", "padding": "5px", "maxHeight": "80px", "overflowY": "auto"

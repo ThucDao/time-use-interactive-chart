@@ -572,4 +572,49 @@ select#compare-mode:disabled {
     .navbar-row-actions {
         display: none !important;
     }
+
+    /* Mobile Legend & BCR Play Bar Layout Fixes */
+    .col-card {
+        height: 520px !important;
+    }
+
+    #chart-container-ca,
+    #chart-container-vn {
+        flex: 1 1 0 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .legend-container {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        padding: 3px 2px !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+
+    .legend-btn {
+        font-size: 0.62rem !important;
+        padding: 1px 5px !important;
+        border-radius: 9px !important;
+        line-height: 1.2 !important;
+    }
+
+    #legend-container-ca,
+    #legend-container-vn {
+        flex-shrink: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .bcr-controls {
+        flex-shrink: 0 !important;
+        min-height: 36px !important;
+        padding: 4px 4px 2px 4px !important;
+        position: relative !important;
+        z-index: 5 !important;
+        background-color: #ffffff !important;
+    }
 }
